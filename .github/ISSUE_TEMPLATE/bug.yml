@@ -1,0 +1,16 @@
+name: Bug
+description: Something is broken
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Steps, expected vs actual, screenshots or Slack link.
+    validations:
+      required: true
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      multiple: true
+      options: [Web, iOS, Android]

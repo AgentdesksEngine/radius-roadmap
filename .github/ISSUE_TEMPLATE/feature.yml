@@ -1,0 +1,10 @@
+name: Feature request
+description: Something we should build
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+      description: The problem, who has it, and any design links.
+    validations:
+      required: true
