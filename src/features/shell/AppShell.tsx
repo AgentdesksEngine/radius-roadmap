@@ -17,7 +17,16 @@ function isTyping(e: KeyboardEvent) {
 export function AppShell() {
   const schema = useSchema();
   useBoard(Boolean(schema.data));
-  const { openKey, openIssue, setNewIssueOpen, setPaletteOpen, newIssueOpen, paletteOpen } = useUi();
+  const {
+    openKey,
+    openIssue,
+    setNewIssueOpen,
+    setPaletteOpen,
+    newIssueOpen,
+    paletteOpen,
+    selection,
+    setSelection,
+  } = useUi();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -27,7 +36,11 @@ export function AppShell() {
         return;
       }
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'Escape' && openKey && !newIssueOpen && !paletteOpen) openIssue(null);
+      if (e.key === 'Escape' && !newIssueOpen && !paletteOpen) {
+        // A selection is the shallowest thing on screen, so it clears first.
+        if (selection.length) setSelection([]);
+        else if (openKey) openIssue(null);
+      }
       if (e.key === 'c' && !newIssueOpen) {
         e.preventDefault();
         setNewIssueOpen(true);
@@ -39,7 +52,16 @@ export function AppShell() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [openKey, openIssue, setNewIssueOpen, setPaletteOpen, newIssueOpen, paletteOpen]);
+  }, [
+    openKey,
+    openIssue,
+    setNewIssueOpen,
+    setPaletteOpen,
+    newIssueOpen,
+    paletteOpen,
+    selection,
+    setSelection,
+  ]);
 
   return (
     <div className="shell">

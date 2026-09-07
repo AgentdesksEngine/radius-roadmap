@@ -4,11 +4,15 @@ import { useSetField } from '@/api/hooks';
 import { Picker } from '@/components/ui/Picker';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
+import { LOGROCKET_FIELD } from '@/model/logrocket';
 import { formatDate } from '@/model/time';
+import { LogRocketField } from './LogRocketField';
 import { SelectCell } from './SelectCell';
 
 /** Property-rail editor for one custom field, dispatching on data type. */
 export function FieldEditor({ item, field }: { item: BoardItem; field: ProjectField }) {
+  // A session replay is worth more than the URL it is stored as.
+  if (field.name === LOGROCKET_FIELD) return <LogRocketField item={item} field={field} />;
   switch (field.dataType) {
     case 'SINGLE_SELECT':
       return <SelectCell item={item} field={field} className="prop-btn" />;

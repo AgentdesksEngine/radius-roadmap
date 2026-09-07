@@ -23,7 +23,8 @@ export type FieldDataType =
   | 'CLOSED'
   | (string & {});
 
-export type OptionColor = 'GRAY' | 'BLUE' | 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED' | 'PINK' | 'PURPLE';
+export type OptionColor =
+  'GRAY' | 'BLUE' | 'GREEN' | 'YELLOW' | 'ORANGE' | 'RED' | 'PINK' | 'PURPLE';
 
 export interface FieldOption {
   id: string;
@@ -74,6 +75,33 @@ export type FieldValue =
 export type IssueState = 'OPEN' | 'CLOSED';
 export type IssueStateReason = 'COMPLETED' | 'NOT_PLANNED' | 'REOPENED' | 'DUPLICATE';
 
+export type ReactionContent =
+  'THUMBS_UP' | 'THUMBS_DOWN' | 'LAUGH' | 'HOORAY' | 'CONFUSED' | 'HEART' | 'ROCKET' | 'EYES';
+
+export interface Reaction {
+  content: ReactionContent;
+  count: number;
+  viewerHasReacted: boolean;
+}
+
+/** A lightweight pointer to another issue (parent, sub-issue, duplicate target). */
+export interface IssueRef {
+  id: string;
+  number: number;
+  key: string;
+  title: string;
+  state: IssueState;
+  stateReason: IssueStateReason | null;
+  url: string;
+  assignees: Person[];
+}
+
+export interface SubIssueProgress {
+  total: number;
+  completed: number;
+  percent: number;
+}
+
 export interface BoardItem {
   /** Project item node id (PVTI_...). Used for field mutations. */
   itemId: string;
@@ -95,6 +123,11 @@ export interface BoardItem {
   assignees: Person[];
   labels: { name: string; color: string }[];
   commentCount: number;
+  /** Archived project items stay in the project but are hidden from every view by default. */
+  isArchived: boolean;
+  parent: IssueRef | null;
+  subIssues: SubIssueProgress;
+  reactions: Reaction[];
   /** Custom field values keyed by field *name*. Unset fields are absent. */
   fields: Record<string, FieldValue>;
 }
@@ -102,6 +135,8 @@ export interface BoardItem {
 export interface BoardData {
   items: BoardItem[];
   fetchedAt: string;
+  /** How the server produced this copy: served from memory, delta-synced, or fully re-read. */
+  source?: 'cache' | 'delta' | 'full';
 }
 
 export interface SessionUser {
@@ -133,6 +168,43 @@ export interface IssueComment {
   body: string;
   createdAt: string;
   author: Person | null;
+  reactions: Reaction[];
+}
+
+/**
+ * One entry in an issue's activity feed: a comment or a GitHub timeline event.
+ * Kinds we cannot render usefully are dropped server-side rather than shown as "other".
+ */
+export type ActivityKind =
+  | 'comment'
+  | 'closed'
+  | 'reopened'
+  | 'assigned'
+  | 'unassigned'
+  | 'labeled'
+  | 'unlabeled'
+  | 'renamed'
+  | 'status'
+  | 'referenced'
+  | 'sub-issue-added'
+  | 'sub-issue-removed'
+  | 'parent-added'
+  | 'parent-removed'
+  | 'duplicate';
+
+export interface ActivityEvent {
+  id: string;
+  kind: ActivityKind;
+  createdAt: string;
+  actor: Person | null;
+  /** Comment body, for kind 'comment'. */
+  body?: string;
+  reactions?: Reaction[];
+  /** What changed: a label, an assignee login, an issue key, a status name. */
+  detail?: string;
+  from?: string;
+  to?: string;
+  url?: string;
 }
 
 /** Value accepted by POST /api/items/:itemId/field */
@@ -151,6 +223,19 @@ export interface CreateIssueRequest {
   fields?: Record<string, FieldWriteValue>;
   assigneeLogins?: string[];
   labelNames?: string[];
+}
+
+/** Apply one field value to many items in a single request. */
+export interface BulkFieldRequest {
+  itemIds: string[];
+  fieldId: string;
+  value: FieldWriteValue;
+}
+
+export interface BulkResult {
+  /** Refreshed items, for the client to fold back into its board cache. */
+  items: BoardItem[];
+  failed: { itemId: string; error: string }[];
 }
 
 export interface ApiError {

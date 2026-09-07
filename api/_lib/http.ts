@@ -52,6 +52,21 @@ export function readJson<T>(req: VercelRequest): T {
   return body as T;
 }
 
+/**
+ * The request body exactly as it arrived. Signature checks have to run over the original
+ * bytes — re-serialising the parsed JSON does not reproduce them.
+ */
+export async function readRawBody(req: VercelRequest): Promise<string> {
+  const withRaw = req as VercelRequest & { rawBody?: string | Buffer };
+  if (withRaw.rawBody != null) {
+    return Buffer.isBuffer(withRaw.rawBody) ? withRaw.rawBody.toString('utf8') : withRaw.rawBody;
+  }
+  if (typeof req.body === 'string') return req.body;
+  const chunks: Buffer[] = [];
+  for await (const chunk of req) chunks.push(chunk as Buffer);
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 export function param(req: VercelRequest, name: string): string {
   const v = req.query[name];
   const s = Array.isArray(v) ? v[0] : v;

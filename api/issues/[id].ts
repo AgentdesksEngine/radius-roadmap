@@ -3,6 +3,7 @@ import { HttpError, param, readJson, route } from '../_lib/http';
 import { requireToken } from '../_lib/session';
 import { GitHubClient } from '../_lib/github/gql';
 import { getItem, setIssueState, syncStatusToState, updateIssue } from '../_lib/github/board';
+import { cacheItems } from '../_lib/board-cache';
 
 const Body = z.object({
   title: z.string().trim().min(1).max(256).optional(),
@@ -27,6 +28,7 @@ export default route({
     if (state) await setIssueState(gh, issueId, state, stateReason);
     let item = null;
     if (itemId) item = state ? await syncStatusToState(gh, itemId) : await getItem(gh, itemId);
+    if (item) cacheItems([item]);
     res.status(200).json({ ok: true, item });
   },
 });

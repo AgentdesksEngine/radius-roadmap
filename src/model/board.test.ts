@@ -1,6 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardItem, ProjectSchema } from '@shared/types';
-import { DEFAULT_FILTERS, filterItems, groupItems, matchesQuery, sortItems } from './board';
+import {
+  DEFAULT_FILTERS,
+  childrenOf,
+  filterItems,
+  groupItems,
+  intakeItems,
+  matchesQuery,
+  missingTriageFields,
+  needsTriage,
+  sortItems,
+} from './board';
 
 const schema: ProjectSchema = {
   projectId: 'P',
@@ -59,20 +69,38 @@ function item(partial: Partial<BoardItem> & { number: number }): BoardItem {
     assignees: [],
     labels: [],
     commentCount: 0,
+    isArchived: false,
+    parent: null,
+    subIssues: { total: 0, completed: 0, percent: 0 },
+    reactions: [],
     fields: {},
     ...partial,
   };
 }
 
 const items = [
-  item({ number: 1, fields: { Status: { kind: 'singleSelect', optionId: 'todo', name: 'Todo' }, Team: { kind: 'singleSelect', optionId: 'ios', name: 'iOS' } } }),
+  item({
+    number: 1,
+    fields: {
+      Status: { kind: 'singleSelect', optionId: 'todo', name: 'Todo' },
+      Team: { kind: 'singleSelect', optionId: 'ios', name: 'iOS' },
+    },
+  }),
   item({
     number: 2,
     state: 'CLOSED',
     closedAt: '2020-01-01T00:00:00Z',
-    fields: { Status: { kind: 'singleSelect', optionId: 'done', name: 'Done' }, Priority: { kind: 'singleSelect', optionId: 'urgent', name: 'Urgent' } },
+    fields: {
+      Status: { kind: 'singleSelect', optionId: 'done', name: 'Done' },
+      Priority: { kind: 'singleSelect', optionId: 'urgent', name: 'Urgent' },
+    },
   }),
-  item({ number: 3, title: 'Crash on login', body: 'Stack trace mentions keychain', assignees: [{ login: 'alice', avatarUrl: '' }] }),
+  item({
+    number: 3,
+    title: 'Crash on login',
+    body: 'Stack trace mentions keychain',
+    assignees: [{ login: 'alice', avatarUrl: '' }],
+  }),
 ];
 
 describe('groupItems', () => {
@@ -93,13 +121,23 @@ describe('filterItems', () => {
     expect(filterItems(items, DEFAULT_FILTERS).map((i) => i.number)).toEqual([1, 3]);
   });
   it('filters by team option name', () => {
-    expect(filterItems(items, { ...DEFAULT_FILTERS, team: 'iOS' }).map((i) => i.number)).toEqual([1]);
+    expect(filterItems(items, { ...DEFAULT_FILTERS, team: 'iOS' }).map((i) => i.number)).toEqual([
+      1,
+    ]);
   });
   it('treats missing values as __none in select filters', () => {
-    expect(filterItems(items, { ...DEFAULT_FILTERS, state: 'all', select: { Priority: ['__none'] } }).map((i) => i.number)).toEqual([1, 3]);
+    expect(
+      filterItems(items, {
+        ...DEFAULT_FILTERS,
+        state: 'all',
+        select: { Priority: ['__none'] },
+      }).map((i) => i.number),
+    ).toEqual([1, 3]);
   });
   it('filters unassigned', () => {
-    expect(filterItems(items, { ...DEFAULT_FILTERS, assignees: ['__none'] }).map((i) => i.number)).toEqual([1]);
+    expect(
+      filterItems(items, { ...DEFAULT_FILTERS, assignees: ['__none'] }).map((i) => i.number),
+    ).toEqual([1]);
   });
 });
 
@@ -116,5 +154,69 @@ describe('matchesQuery', () => {
 describe('sortItems', () => {
   it('sorts by priority rank with unset last', () => {
     expect(sortItems(items, 'priority', 'asc', schema).map((i) => i.number)).toEqual([2, 1, 3]);
+  });
+});
+
+describe('archived items', () => {
+  const archived = item({ number: 4, isArchived: true });
+  const all = [...items, archived];
+
+  it('are hidden from every normal view', () => {
+    expect(filterItems(all, { ...DEFAULT_FILTERS, state: 'all' }).map((i) => i.number)).toEqual([
+      1, 2, 3,
+    ]);
+  });
+  it('are the only thing the archived view shows', () => {
+    expect(
+      filterItems(all, { ...DEFAULT_FILTERS, state: 'all', archived: true }).map((i) => i.number),
+    ).toEqual([4]);
+  });
+});
+
+describe('intake', () => {
+  const triaged = item({
+    number: 5,
+    fields: {
+      Team: { kind: 'singleSelect', optionId: 'ios', name: 'iOS' },
+      Priority: { kind: 'singleSelect', optionId: 'low', name: 'Low' },
+      'Work type': { kind: 'singleSelect', optionId: 'bug', name: 'Bug' },
+    },
+  });
+
+  it('lists what each issue is still missing', () => {
+    expect(missingTriageFields(triaged)).toEqual([]);
+    expect(missingTriageFields(items[0]!)).toEqual(['Priority', 'Work type']);
+  });
+  it('leaves fully triaged, closed and archived issues out of the queue', () => {
+    expect(needsTriage(triaged)).toBe(false);
+    expect(needsTriage(items[1]!)).toBe(false); // closed
+    expect(needsTriage(item({ number: 6, isArchived: true }))).toBe(false);
+  });
+  it('queues untriaged open issues newest first', () => {
+    const older = item({ number: 7, createdAt: '2025-01-01T00:00:00Z' });
+    expect(intakeItems([older, ...items, triaged]).map((i) => i.number)).toEqual([1, 3, 7]);
+  });
+});
+
+describe('childrenOf', () => {
+  it('finds sub-issues by their parent number, in issue order', () => {
+    const parent = {
+      id: 'I_1',
+      number: 1,
+      key: 'RAD-1',
+      title: 'p',
+      state: 'OPEN' as const,
+      stateReason: null,
+      url: '',
+      assignees: [],
+    };
+    const kids = [item({ number: 9, parent }), item({ number: 8, parent }), item({ number: 10 })];
+    expect(childrenOf(kids, 1).map((i) => i.number)).toEqual([8, 9]);
+  });
+});
+
+describe('manual sort', () => {
+  it('leaves the project order untouched', () => {
+    expect(sortItems(items, 'manual', 'asc', schema).map((i) => i.number)).toEqual([1, 2, 3]);
   });
 });

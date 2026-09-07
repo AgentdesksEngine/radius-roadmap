@@ -1,4 +1,11 @@
-import type { BoardItem, FieldOption, FieldValue, OptionColor, ProjectField, ProjectSchema } from '@shared/types';
+import type {
+  BoardItem,
+  FieldOption,
+  FieldValue,
+  OptionColor,
+  ProjectField,
+  ProjectSchema,
+} from '@shared/types';
 
 export const STATUS = 'Status';
 export const TEAM = 'Team';
@@ -6,6 +13,10 @@ export const PRIORITY = 'Priority';
 export const SEVERITY = 'Severity';
 export const WORK_TYPE = 'Work type';
 export const MODULE = 'Module';
+export const PLATFORM = 'Platform';
+
+/** Fields an issue must have before anyone can pick it up. Drives the intake queue. */
+export const TRIAGE_FIELDS = [TEAM, PRIORITY, WORK_TYPE];
 
 /** Built-in fields that are not editable custom fields. */
 const BUILT_IN = new Set([
@@ -47,7 +58,10 @@ export function selectName(item: BoardItem, name: string): string | undefined {
   return v?.kind === 'singleSelect' ? v.name : undefined;
 }
 
-export function selectOption(item: BoardItem, f: ProjectField | undefined): FieldOption | undefined {
+export function selectOption(
+  item: BoardItem,
+  f: ProjectField | undefined,
+): FieldOption | undefined {
   if (!f) return undefined;
   const v = item.fields[f.name];
   return v?.kind === 'singleSelect' ? f.options?.find((o) => o.id === v.optionId) : undefined;
@@ -115,9 +129,17 @@ export function groupItems(items: BoardItem[], groupBy: string, schema: ProjectS
   const f = field(schema, groupBy);
   if (!f?.options) return [{ key: '__all', label: 'All', items }];
   const byOption = new Map<string, Group>(
-    f.options.map((o) => [o.id, { key: o.id, label: o.name, color: o.color, optionId: o.id, items: [] }]),
+    f.options.map((o) => [
+      o.id,
+      { key: o.id, label: o.name, color: o.color, optionId: o.id, items: [] },
+    ]),
   );
-  const none: Group = { key: '__none', label: `No ${f.name.toLowerCase()}`, empty: true, items: [] };
+  const none: Group = {
+    key: '__none',
+    label: `No ${f.name.toLowerCase()}`,
+    empty: true,
+    items: [],
+  };
   for (const it of items) {
     const v = it.fields[f.name];
     const g = v?.kind === 'singleSelect' ? byOption.get(v.optionId) : undefined;
@@ -139,9 +161,18 @@ export interface Filters {
   select: Record<string, string[]>;
   assignees: string[]; // logins, '__none' = unassigned
   query: string;
+  /** Archived items are a separate world: true shows only them, false only the live board. */
+  archived: boolean;
 }
 
-export const DEFAULT_FILTERS: Filters = { team: null, state: 'active', select: {}, assignees: [], query: '' };
+export const DEFAULT_FILTERS: Filters = {
+  team: null,
+  state: 'active',
+  select: {},
+  assignees: [],
+  query: '',
+  archived: false,
+};
 
 const RECENT_MS = 14 * 24 * 3600_000;
 
@@ -154,7 +185,10 @@ export function matchesState(item: BoardItem, state: StateFilter, now = Date.now
     case 'all':
       return true;
     default:
-      return item.state === 'OPEN' || (item.closedAt != null && now - Date.parse(item.closedAt) < RECENT_MS);
+      return (
+        item.state === 'OPEN' ||
+        (item.closedAt != null && now - Date.parse(item.closedAt) < RECENT_MS)
+      );
   }
 }
 
@@ -168,13 +202,16 @@ export function matchesQuery(item: BoardItem, q: string): boolean {
   if (key === q || key.endsWith(`-${q}`) || String(item.number) === q) return true;
   if (item.title.toLowerCase().includes(q)) return true;
   if (item.body.toLowerCase().includes(q)) return true;
-  return item.assignees.some((a) => a.login.toLowerCase().includes(q) || a.name?.toLowerCase().includes(q));
+  return item.assignees.some(
+    (a) => a.login.toLowerCase().includes(q) || a.name?.toLowerCase().includes(q),
+  );
 }
 
 export function filterItems(items: BoardItem[], filters: Filters, now = Date.now()): BoardItem[] {
   const q = normalizeQuery(filters.query);
   const selectEntries = Object.entries(filters.select).filter(([, v]) => v.length);
   return items.filter((it) => {
+    if (it.isArchived !== filters.archived) return false;
     if (filters.team && selectName(it, TEAM) !== filters.team) return false;
     if (!matchesState(it, filters.state, now)) return false;
     for (const [fname, names] of selectEntries) {
@@ -183,7 +220,9 @@ export function filterItems(items: BoardItem[], filters: Filters, now = Date.now
     }
     if (filters.assignees.length) {
       const logins = it.assignees.map((a) => a.login);
-      const hit = filters.assignees.some((a) => (a === '__none' ? logins.length === 0 : logins.includes(a)));
+      const hit = filters.assignees.some((a) =>
+        a === '__none' ? logins.length === 0 : logins.includes(a),
+      );
       if (!hit) return false;
     }
     return matchesQuery(it, q);
@@ -191,12 +230,42 @@ export function filterItems(items: BoardItem[], filters: Filters, now = Date.now
 }
 
 export function activeFilterCount(f: Filters) {
-  return Object.values(f.select).filter((v) => v.length).length + (f.assignees.length ? 1 : 0) + (f.state !== 'active' ? 1 : 0);
+  return (
+    Object.values(f.select).filter((v) => v.length).length +
+    (f.assignees.length ? 1 : 0) +
+    (f.state !== 'active' ? 1 : 0) +
+    (f.archived ? 1 : 0)
+  );
+}
+
+// ---------- Intake ----------
+
+/**
+ * An issue is in intake until someone has said who owns it, how urgent it is and what
+ * kind of work it is. Everything else about triage is a judgement call; this part isn't.
+ */
+export function missingTriageFields(item: BoardItem): string[] {
+  return TRIAGE_FIELDS.filter((name) => !selectName(item, name));
+}
+
+export function needsTriage(item: BoardItem): boolean {
+  return item.state === 'OPEN' && !item.isArchived && missingTriageFields(item).length > 0;
+}
+
+export function intakeItems(items: BoardItem[]): BoardItem[] {
+  return items.filter(needsTriage).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+// ---------- Sub-issues ----------
+
+/** Children are derived from the board rather than fetched: every issue here is a project item. */
+export function childrenOf(items: BoardItem[], parentNumber: number): BoardItem[] {
+  return items.filter((i) => i.parent?.number === parentNumber).sort((a, b) => a.number - b.number);
 }
 
 // ---------- Sorting ----------
 
-export type SortKey = 'updated' | 'created' | 'priority' | 'number' | 'title' | 'status';
+export type SortKey = 'manual' | 'updated' | 'created' | 'priority' | 'number' | 'title' | 'status';
 
 export function optionRank(schema: ProjectSchema, fieldName: string, item: BoardItem): number {
   const f = field(schema, fieldName);
@@ -206,7 +275,14 @@ export function optionRank(schema: ProjectSchema, fieldName: string, item: Board
   return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
 }
 
-export function sortItems(items: BoardItem[], sort: SortKey, dir: 'asc' | 'desc', schema: ProjectSchema): BoardItem[] {
+export function sortItems(
+  items: BoardItem[],
+  sort: SortKey,
+  dir: 'asc' | 'desc',
+  schema: ProjectSchema,
+): BoardItem[] {
+  // 'manual' is the project's own item order, which is how the API returns them.
+  if (sort === 'manual') return items;
   const m = dir === 'asc' ? 1 : -1;
   const cmp = (a: BoardItem, b: BoardItem): number => {
     switch (sort) {
@@ -217,9 +293,15 @@ export function sortItems(items: BoardItem[], sort: SortKey, dir: 'asc' | 'desc'
       case 'title':
         return a.title.localeCompare(b.title);
       case 'priority':
-        return optionRank(schema, PRIORITY, a) - optionRank(schema, PRIORITY, b) || b.updatedAt.localeCompare(a.updatedAt) * m;
+        return (
+          optionRank(schema, PRIORITY, a) - optionRank(schema, PRIORITY, b) ||
+          b.updatedAt.localeCompare(a.updatedAt) * m
+        );
       case 'status':
-        return optionRank(schema, STATUS, a) - optionRank(schema, STATUS, b) || b.updatedAt.localeCompare(a.updatedAt) * m;
+        return (
+          optionRank(schema, STATUS, a) - optionRank(schema, STATUS, b) ||
+          b.updatedAt.localeCompare(a.updatedAt) * m
+        );
       default:
         return a.updatedAt.localeCompare(b.updatedAt);
     }
@@ -230,7 +312,7 @@ export function sortItems(items: BoardItem[], sort: SortKey, dir: 'asc' | 'desc'
 export function teamCounts(items: BoardItem[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const it of items) {
-    if (it.state !== 'OPEN') continue;
+    if (it.state !== 'OPEN' || it.isArchived) continue;
     const t = selectName(it, TEAM) ?? '__none';
     m.set(t, (m.get(t) ?? 0) + 1);
   }

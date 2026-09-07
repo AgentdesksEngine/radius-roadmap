@@ -1,0 +1,63 @@
+.sheet-wrap {
+  flex: 1;
+  overflow: auto;
+  min-height: 0;
+}
+.sheet {
+  display: grid;
+  min-width: max-content;
+  align-content: start;
+}
+.sheet-head,
+.sheet-row {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.sheet-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--bg);
+  height: 30px;
+  font-size: 11.5px;
+  color: var(--text-2);
+}
+.sheet-head > span {
+  padding: 0 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sheet-row:hover {
+  background: var(--bg-subtle);
+}
+.sheet-row.selected {
+  background: var(--accent-soft);
+}
+.sheet .cell {
+  padding: 0 8px;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+}
+.sheet .cell.title {
+  font-weight: 500;
+  text-align: left;
+  white-space: nowrap;
+}
+.sheet .cell.title:hover {
+  text-decoration: underline;
+}
+/* Field editors sit flush inside a dense cell. */
+.sheet .cell .prop-btn,
+.sheet .cell .cell-btn,
+.sheet .cell .prop-input {
+  margin-left: 0;
+  height: 24px;
+  font-size: 12px;
+}

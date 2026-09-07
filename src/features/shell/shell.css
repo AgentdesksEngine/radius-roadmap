@@ -222,3 +222,30 @@
     width: 140px;
   }
 }
+
+.nav-row {
+  display: flex;
+  align-items: center;
+}
+.nav-row .row-menu {
+  opacity: 0;
+  flex: none;
+}
+.nav-row:hover .row-menu,
+.nav-row .row-menu[data-state='open'] {
+  opacity: 1;
+}
+.sidebar-hint {
+  padding: 2px 8px 4px;
+  font-size: 11px;
+  color: var(--text-3);
+  line-height: 1.4;
+}
+.sidebar-section .icon-btn {
+  width: 18px;
+  height: 18px;
+}
+.sidebar-section .icon-btn svg {
+  width: 12px;
+  height: 12px;
+}

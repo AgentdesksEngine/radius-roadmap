@@ -127,4 +127,7 @@ export const fields: FieldSpec[] = [
   { name: 'Brokerage', type: 'TEXT' },
   { name: 'Reported by', type: 'TEXT' },
   { name: 'Slack link', type: 'TEXT' },
+  // A LogRocket session replay URL. The panel renders it as a replay card and, when it is
+  // empty, links out to the LogRocket projects that match the issue's Platform or Team.
+  { name: 'LogRocket', type: 'TEXT' },
 ];

@@ -30,6 +30,12 @@
   --c-pink: #d95aa0;
   --c-purple: #8b5cf6;
 
+  /* Chart series. Validated for CVD separation and contrast against the light surface;
+     the dark block below re-steps them rather than flipping them. */
+  --chart-1: #4a8be0;
+  --chart-2: #3fa36b;
+  --chart-seq: #e0793a;
+
   --radius: 6px;
   --radius-sm: 4px;
   --sidebar-w: 224px;
@@ -55,6 +61,10 @@
   --danger: #ef6b6b;
   --success: #4cc27a;
   --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border);
+
+  --chart-1: #5b93dd;
+  --chart-2: #45a874;
+  --chart-seq: #cf7738;
 
   --c-gray: #8a8a96;
   --c-blue: #6ca2ee;
