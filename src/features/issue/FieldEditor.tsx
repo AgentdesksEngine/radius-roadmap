@@ -4,6 +4,7 @@ import { useSetField } from '@/api/hooks';
 import { Picker } from '@/components/ui/Picker';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
+import { formatDate } from '@/model/time';
 import { SelectCell } from './SelectCell';
 
 /** Property-rail editor for one custom field, dispatching on data type. */
@@ -68,15 +69,18 @@ function DateEditor({ item, field }: { item: BoardItem; field: ProjectField }) {
   const v = item.fields[field.name];
   const date = v?.kind === 'date' ? v.date : '';
   return (
-    <input
-      type="date"
-      className="prop-input"
-      value={date}
-      onChange={(e) => {
-        const d = e.target.value;
-        write(d ? { date: d } : null, d ? { kind: 'date', date: d } : null);
-      }}
-    />
+    <span className="date-wrap">
+      <span className={`prop-btn ${date ? '' : 'empty'}`}>{date ? formatDate(date) : 'Empty'}</span>
+      <input
+        type="date"
+        aria-label={field.name}
+        value={date}
+        onChange={(e) => {
+          const d = e.target.value;
+          write(d ? { date: d } : null, d ? { kind: 'date', date: d } : null);
+        }}
+      />
+    </span>
   );
 }
 

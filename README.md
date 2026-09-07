@@ -22,6 +22,10 @@ Browser (Vite + React SPA)  →  /api/* (Vercel functions)  →  GitHub GraphQL 
 - **Data**: `api/_lib/github/board.ts` is the single module that reads and writes the
   project (schema, items, field updates, issue create/edit, comments). Field and option
   ids are fetched and cached, never hardcoded.
+- **Status ↔ issue state**: setting Status to Done / Canceled / Can't reproduce closes the
+  GitHub issue (completed / not planned); any other status reopens it. Closing or reopening
+  from the panel moves Status to Done / Canceled / Todo. GitHub's own project workflows do
+  the same a few seconds later for changes made directly on github.com.
 - **Schema as code**: `fields.config.ts` declares the custom fields. `pnpm schema:provision`
   makes the live project match it (create/extend only, never delete).
 

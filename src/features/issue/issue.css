@@ -200,3 +200,19 @@
   color: var(--text-3);
   text-align: center;
 }
+
+/* Date: show a formatted value, keep the native picker clickable underneath */
+.date-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.date-wrap input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+  width: 100%;
+}
+.date-wrap:hover .prop-btn {
+  background: var(--bg-hover);
+}

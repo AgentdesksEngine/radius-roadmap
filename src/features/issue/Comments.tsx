@@ -26,7 +26,7 @@ export function Comments({ item }: { item: BoardItem }) {
     <section>
       <div className="section-title">
         <span>Activity</span>
-        {comments.data && <span>{comments.data.length} comments</span>}
+        {comments.data && <span>{comments.data.length === 1 ? '1 comment' : `${comments.data.length} comments`}</span>}
       </div>
       {comments.isPending && <div className="skeleton" style={{ height: 40 }} />}
       {comments.isError && <div className="faint">Couldn’t load comments.</div>}
