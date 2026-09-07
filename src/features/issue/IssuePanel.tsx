@@ -1,7 +1,19 @@
 import { useEffect, useRef, useState } from 'react';
-import { CheckCircle2, ChevronDown, CircleDot, ExternalLink, Pencil, X, XCircle } from 'lucide-react';
+import {
+  Archive,
+  ArchiveRestore,
+  CheckCircle2,
+  ChevronDown,
+  CircleDot,
+  ExternalLink,
+  Link2,
+  MoreHorizontal,
+  Pencil,
+  X,
+  XCircle,
+} from 'lucide-react';
 import type { BoardItem, Person } from '@shared/types';
-import { useBoard, useMembers, useSchema, useUpdateIssue } from '@/api/hooks';
+import { useArchiveItem, useBoard, useMembers, useSchema, useUpdateIssue } from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/Menu';
@@ -10,9 +22,11 @@ import { useToast } from '@/components/ui/Toast';
 import { customFields } from '@/model/board';
 import { formatDateTime, timeAgo } from '@/model/time';
 import { useUi } from '../shell/state';
-import { Comments } from './Comments';
+import { Activity } from './Activity';
 import { FieldEditor } from './FieldEditor';
 import { MarkdownBody } from './Markdown';
+import { Reactions } from './Reactions';
+import { SubIssues } from './SubIssues';
 import './issue.css';
 
 export function IssuePanel() {
@@ -36,7 +50,9 @@ export function IssuePanel() {
                 <X />
               </IconButton>
             </header>
-            <div className="panel-notfound">{board.isPending ? <span className="spinner" /> : `${openKey} isn’t on this board.`}</div>
+            <div className="panel-notfound">
+              {board.isPending ? <span className="spinner" /> : `${openKey} isn’t on this board.`}
+            </div>
           </>
         )}
       </aside>
@@ -47,6 +63,7 @@ export function IssuePanel() {
 function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void }) {
   const { data: schema } = useSchema();
   const update = useUpdateIssue();
+  const archive = useArchiveItem();
   const toast = useToast();
   const { data: members } = useMembers();
 
@@ -74,13 +91,25 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
   };
 
   const setAssignees = (next: Person[]) =>
-    patch({ issueId: item.issueId, itemId: item.itemId, assigneeLogins: next.map((p) => p.login), optimisticAssignees: next }, 'assignees');
+    patch(
+      {
+        issueId: item.issueId,
+        itemId: item.itemId,
+        assigneeLogins: next.map((p) => p.login),
+        optimisticAssignees: next,
+      },
+      'assignees',
+    );
 
   const toggleAssignee = (login: string) => {
     const has = item.assignees.some((a) => a.login === login);
     const person = members?.find((m) => m.login === login);
     if (has) setAssignees(item.assignees.filter((a) => a.login !== login));
-    else if (person) setAssignees([...item.assignees, { login: person.login, avatarUrl: person.avatarUrl, name: person.name }]);
+    else if (person)
+      setAssignees([
+        ...item.assignees,
+        { login: person.login, avatarUrl: person.avatarUrl, name: person.name },
+      ]);
   };
 
   const fields = schema ? customFields(schema) : [];
@@ -92,23 +121,67 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
         <span className="mono muted">{item.key}</span>
         <Menu>
           <MenuTrigger asChild>
-            <button className={`state-pill ${closed ? (item.stateReason === 'COMPLETED' ? 'closed' : 'not-planned') : ''}`}>
-              {closed ? item.stateReason === 'COMPLETED' ? <CheckCircle2 /> : <XCircle /> : <CircleDot />}
-              {closed ? (item.stateReason === 'COMPLETED' ? 'Closed' : item.stateReason === 'DUPLICATE' ? 'Duplicate' : 'Not planned') : 'Open'}
+            <button
+              className={`state-pill ${closed ? (item.stateReason === 'COMPLETED' ? 'closed' : 'not-planned') : ''}`}
+            >
+              {closed ? (
+                item.stateReason === 'COMPLETED' ? (
+                  <CheckCircle2 />
+                ) : (
+                  <XCircle />
+                )
+              ) : (
+                <CircleDot />
+              )}
+              {closed
+                ? item.stateReason === 'COMPLETED'
+                  ? 'Closed'
+                  : item.stateReason === 'DUPLICATE'
+                    ? 'Duplicate'
+                    : 'Not planned'
+                : 'Open'}
               <ChevronDown />
             </button>
           </MenuTrigger>
           <MenuContent>
             {closed ? (
-              <MenuItem onSelect={() => patch({ issueId: item.issueId, itemId: item.itemId, state: 'OPEN' }, 'state')}>
+              <MenuItem
+                onSelect={() =>
+                  patch({ issueId: item.issueId, itemId: item.itemId, state: 'OPEN' }, 'state')
+                }
+              >
                 <CircleDot /> Reopen issue
               </MenuItem>
             ) : (
               <>
-                <MenuItem onSelect={() => patch({ issueId: item.issueId, itemId: item.itemId, state: 'CLOSED', stateReason: 'COMPLETED' }, 'state')}>
+                <MenuItem
+                  onSelect={() =>
+                    patch(
+                      {
+                        issueId: item.issueId,
+                        itemId: item.itemId,
+                        state: 'CLOSED',
+                        stateReason: 'COMPLETED',
+                      },
+                      'state',
+                    )
+                  }
+                >
                   <CheckCircle2 /> Close as completed
                 </MenuItem>
-                <MenuItem onSelect={() => patch({ issueId: item.issueId, itemId: item.itemId, state: 'CLOSED', stateReason: 'NOT_PLANNED' }, 'state')}>
+                <MenuItem
+                  onSelect={() =>
+                    patch(
+                      {
+                        issueId: item.issueId,
+                        itemId: item.itemId,
+                        state: 'CLOSED',
+                        stateReason: 'NOT_PLANNED',
+                      },
+                      'state',
+                    )
+                  }
+                >
                   <XCircle /> Close as not planned
                 </MenuItem>
               </>
@@ -116,6 +189,43 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
           </MenuContent>
         </Menu>
         <span className="spacer" />
+        {item.isArchived && <span className="tag">Archived</span>}
+        <Menu>
+          <MenuTrigger asChild>
+            <button className="icon-btn" aria-label="More actions">
+              <MoreHorizontal />
+            </button>
+          </MenuTrigger>
+          <MenuContent align="end">
+            <MenuItem
+              onSelect={() => {
+                void navigator.clipboard?.writeText(
+                  `${window.location.origin}/board?i=${item.key}`,
+                );
+                toast.success(`Copied a link to ${item.key}`);
+              }}
+            >
+              <Link2 /> Copy link
+            </MenuItem>
+            <MenuItem
+              onSelect={() =>
+                archive.mutate(
+                  { itemId: item.itemId, archived: !item.isArchived },
+                  {
+                    onSuccess: () =>
+                      toast.success(
+                        item.isArchived ? `${item.key} restored` : `${item.key} archived`,
+                      ),
+                    onError: (e) => toast.error(`Couldn’t archive: ${e.message}`),
+                  },
+                )
+              }
+            >
+              {item.isArchived ? <ArchiveRestore /> : <Archive />}
+              {item.isArchived ? 'Restore to board' : 'Archive'}
+            </MenuItem>
+          </MenuContent>
+        </Menu>
         <IconButton label="Open in GitHub" onClick={() => window.open(item.url, '_blank')}>
           <ExternalLink />
         </IconButton>
@@ -147,7 +257,13 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
 
         {editingBody ? (
           <div className="composer">
-            <textarea className="textarea" style={{ minHeight: 160 }} autoFocus value={bodyDraft} onChange={(e) => setBodyDraft(e.target.value)} />
+            <textarea
+              className="textarea"
+              style={{ minHeight: 160 }}
+              autoFocus
+              value={bodyDraft}
+              onChange={(e) => setBodyDraft(e.target.value)}
+            />
             <div className="actions">
               <Button size="sm" variant="ghost" onClick={() => setEditingBody(false)}>
                 Cancel
@@ -156,7 +272,11 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
                 size="sm"
                 variant="primary"
                 onClick={() => {
-                  if (bodyDraft !== item.body) patch({ issueId: item.issueId, itemId: item.itemId, body: bodyDraft }, 'description');
+                  if (bodyDraft !== item.body)
+                    patch(
+                      { issueId: item.issueId, itemId: item.itemId, body: bodyDraft },
+                      'description',
+                    );
                   setEditingBody(false);
                 }}
               >
@@ -166,7 +286,11 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
           </div>
         ) : (
           <div className="body-view">
-            {item.body ? <MarkdownBody>{item.body}</MarkdownBody> : <p className="body-empty">No description</p>}
+            {item.body ? (
+              <MarkdownBody>{item.body}</MarkdownBody>
+            ) : (
+              <p className="body-empty">No description</p>
+            )}
             <IconButton
               label="Edit description"
               size="sm"
@@ -181,10 +305,19 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
           </div>
         )}
 
+        <Reactions subjectId={item.issueId} reactions={item.reactions} itemId={item.itemId} />
+
+        <SubIssues item={item} />
+
         <div className="props">
           <span className="label">Assignees</span>
           <Picker
-            items={(members ?? []).map((m) => ({ id: m.login, label: m.name || m.login, keywords: [m.login], icon: <Avatar person={m} size={16} /> }))}
+            items={(members ?? []).map((m) => ({
+              id: m.login,
+              label: m.name || m.login,
+              keywords: [m.login],
+              icon: <Avatar person={m} size={16} />,
+            }))}
             value={item.assignees.map((a) => a.login)}
             multiple
             onSelect={toggleAssignee}
@@ -194,7 +327,10 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
               {item.assignees.length ? (
                 <span style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap' }}>
                   {item.assignees.map((a) => (
-                    <span key={a.login} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <span
+                      key={a.login}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                    >
                       <Avatar person={a} size={16} />
                       {a.name || a.login}
                     </span>
@@ -227,11 +363,12 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
         </div>
 
         <div className="meta-line">
-          Opened {timeAgo(item.createdAt)} ago by {item.author?.login ?? 'unknown'} · updated {formatDateTime(item.updatedAt)}
+          Opened {timeAgo(item.createdAt)} ago by {item.author?.login ?? 'unknown'} · updated{' '}
+          {formatDateTime(item.updatedAt)}
           {item.closedAt && ` · closed ${formatDateTime(item.closedAt)}`}
         </div>
 
-        <Comments item={item} />
+        <Activity item={item} />
       </div>
     </>
   );

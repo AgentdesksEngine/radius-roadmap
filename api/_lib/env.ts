@@ -5,6 +5,8 @@ const schema = z.object({
   GITHUB_APP_CLIENT_ID: z.string().optional(),
   GITHUB_APP_CLIENT_SECRET: z.string().optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().optional(),
+  /** Shared secret configured on the App's webhook. Without it the webhook route refuses everything. */
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
   GITHUB_ORG: z.string().default('AgentdesksEngine'),
   GITHUB_PROJECT_NUMBER: z.coerce.number().int().positive().default(6),
   GITHUB_ISSUES_REPO: z.string().default('radius-roadmap'),

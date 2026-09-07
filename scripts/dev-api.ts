@@ -58,20 +58,20 @@ function parseCookies(header: string | undefined) {
   return out;
 }
 
-async function readBody(req: http.IncomingMessage): Promise<unknown> {
+async function readBody(req: http.IncomingMessage): Promise<{ body: unknown; raw: string | undefined }> {
   const chunks: Buffer[] = [];
   for await (const c of req) chunks.push(c as Buffer);
-  if (!chunks.length) return undefined;
+  if (!chunks.length) return { body: undefined, raw: undefined };
   const text = Buffer.concat(chunks).toString('utf8');
   const type = req.headers['content-type'] ?? '';
   if (type.includes('application/json')) {
     try {
-      return JSON.parse(text);
+      return { body: JSON.parse(text), raw: text };
     } catch {
-      return text;
+      return { body: text, raw: text };
     }
   }
-  return text;
+  return { body: text, raw: text };
 }
 
 const routes = collectRoutes();
@@ -98,10 +98,17 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Vercel-style request decorations
-  const vreq = req as http.IncomingMessage & { query: Record<string, string | string[]>; cookies: Record<string, string>; body: unknown };
+  const vreq = req as http.IncomingMessage & {
+    query: Record<string, string | string[]>;
+    cookies: Record<string, string>;
+    body: unknown;
+    rawBody?: string;
+  };
   vreq.query = { ...Object.fromEntries(url.searchParams), ...params };
   vreq.cookies = parseCookies(req.headers.cookie);
-  vreq.body = await readBody(req);
+  const parsed = await readBody(req);
+  vreq.body = parsed.body;
+  vreq.rawBody = parsed.raw;
 
   // Vercel-style response helpers
   const vres = res as http.ServerResponse & {

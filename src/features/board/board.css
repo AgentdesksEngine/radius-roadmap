@@ -150,3 +150,43 @@
   flex-direction: column;
   gap: 8px;
 }
+
+.card.selected {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.card-parent {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  margin-right: auto;
+  margin-left: 8px;
+}
+.card-meta .right span {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.quick-add {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px 9px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg);
+}
+.quick-add textarea {
+  border: 0;
+  outline: none;
+  resize: none;
+  background: transparent;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 0;
+}
+.quick-add .faint {
+  font-size: 10.5px;
+}

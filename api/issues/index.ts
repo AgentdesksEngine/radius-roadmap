@@ -3,6 +3,7 @@ import { HttpError, readJson, route } from '../_lib/http';
 import { requireToken } from '../_lib/session';
 import { GitHubClient } from '../_lib/github/gql';
 import { createIssue } from '../_lib/github/board';
+import { cacheItems } from '../_lib/board-cache';
 
 const Body = z.object({
   title: z.string().trim().min(1).max(256),
@@ -30,6 +31,7 @@ export default route({
     const parsed = Body.safeParse(readJson(req));
     if (!parsed.success) throw new HttpError(400, 'Invalid body', parsed.error.issues);
     const item = await createIssue(new GitHubClient(accessToken), parsed.data);
+    cacheItems([item]);
     res.status(201).json(item);
   },
 });

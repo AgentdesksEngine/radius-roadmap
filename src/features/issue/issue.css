@@ -216,3 +216,199 @@
 .date-wrap:hover .prop-btn {
   background: var(--bg-hover);
 }
+
+/* Reactions */
+.reactions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+.reaction {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.reaction:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-hover);
+}
+.reaction.on {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.reaction.add {
+  padding: 0 7px;
+  opacity: 0;
+}
+/* With no reactions yet there is nothing else to hint at the feature, so it stays visible. */
+.reaction.add.bare {
+  opacity: 1;
+  color: var(--text-3);
+}
+.reactions:hover .reaction.add,
+.reaction.add:focus-visible,
+.reaction.add[data-state='open'] {
+  opacity: 1;
+}
+.reaction.add svg {
+  width: 13px;
+  height: 13px;
+}
+.reaction-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+.reaction-grid .menu-item {
+  justify-content: center;
+  font-size: 15px;
+  padding: 0;
+}
+
+/* Timeline events between comments */
+.event {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  color: var(--text-2);
+  font-size: 12px;
+  min-width: 0;
+}
+.event b {
+  font-weight: 500;
+  color: var(--text);
+}
+.event .event-icon {
+  display: inline-flex;
+  color: var(--text-3);
+}
+.event .event-icon svg {
+  width: 13px;
+  height: 13px;
+}
+.event > .faint {
+  margin-left: auto;
+  flex: none;
+}
+a.event:hover b {
+  text-decoration: underline;
+}
+
+/* Parent / sub-issues */
+.sub-issues {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.parent-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  font-size: 12px;
+}
+.sub-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  height: 24px;
+  padding: 0 6px;
+  margin-left: -6px;
+  border-radius: var(--radius-sm);
+  text-align: left;
+}
+.sub-link:hover {
+  background: var(--bg-hover);
+}
+.progress {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-active);
+  overflow: hidden;
+}
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--c-purple);
+  transition: width 0.2s;
+}
+.sub-list {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.sub-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+/* LogRocket session replay */
+.logrocket {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  max-width: 100%;
+}
+.logrocket.empty-state {
+  flex-wrap: wrap;
+  row-gap: 4px;
+}
+.lr-attach {
+  margin-right: 2px;
+  white-space: nowrap;
+}
+.lr-session {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  height: 24px;
+  padding: 0 8px;
+  margin-left: -6px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+.lr-session:hover {
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+}
+.lr-session svg {
+  color: var(--c-purple);
+  flex: none;
+}
+.lr-search {
+  gap: 4px;
+  height: 20px;
+  padding: 0 7px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.lr-search:hover {
+  border-color: var(--border-strong);
+  color: var(--text);
+  background: var(--bg-hover);
+}
+.lr-search svg {
+  flex: none;
+  opacity: 0.6;
+}

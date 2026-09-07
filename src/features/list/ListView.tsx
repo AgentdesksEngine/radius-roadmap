@@ -1,13 +1,30 @@
-import { useEffect, useMemo, useState } from 'react';
-import { flexRender, getCoreRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from '@tanstack/react-table';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from '@tanstack/react-table';
 import { CheckCircle2, XCircle } from 'lucide-react';
 import type { BoardItem } from '@shared/types';
 import { useBoard, useSchema } from '@/api/hooks';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
 import { Tag } from '@/components/ui/Tag';
-import { PRIORITY, STATUS, TEAM, WORK_TYPE, field, filterItems, optionRank, selectOption } from '@/model/board';
+import {
+  PRIORITY,
+  STATUS,
+  TEAM,
+  WORK_TYPE,
+  field,
+  filterItems,
+  optionRank,
+  selectOption,
+} from '@/model/board';
 import { timeAgo } from '@/model/time';
+import { BulkBar } from '../bulk/BulkBar';
 import { SelectCell } from '../issue/SelectCell';
 import { ViewHeader } from '../shell/ViewHeader';
 import { useUi } from '../shell/state';
@@ -16,11 +33,23 @@ import './list.css';
 export function ListView() {
   const { data: schema } = useSchema();
   const board = useBoard(Boolean(schema));
-  const { filters, openIssue, openKey, setNewIssueOpen } = useUi();
+  const { filters, openIssue, openKey, setNewIssueOpen, selection, setSelection, toggleSelected } =
+    useUi();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'updated', desc: true }]);
   const [cursor, setCursor] = useState(0);
+  /** Anchor for shift-click range selection. */
+  const [anchor, setAnchor] = useState<number | null>(null);
 
-  const items = useMemo(() => (board.data ? filterItems(board.data.items, filters) : []), [board.data, filters]);
+  // Read through refs so the column definitions don't rebuild on every selection change.
+  const selectionRef = useRef(selection);
+  selectionRef.current = selection;
+  const toggleRef = useRef(toggleSelected);
+  toggleRef.current = toggleSelected;
+
+  const items = useMemo(
+    () => (board.data ? filterItems(board.data.items, filters) : []),
+    [board.data, filters],
+  );
 
   const columns = useMemo<ColumnDef<BoardItem>[]>(() => {
     if (!schema) return [];
@@ -29,7 +58,28 @@ export function ListView() {
     const teamF = field(schema, TEAM);
     const typeF = field(schema, WORK_TYPE);
     const cols: ColumnDef<BoardItem>[] = [
-      { id: 'key', header: 'ID', accessorFn: (i) => i.number, size: 84, cell: ({ row }) => <span className="mono muted">{row.original.key}</span> },
+      {
+        id: 'select',
+        header: '',
+        size: 28,
+        enableSorting: false,
+        cell: ({ row }) => (
+          <input
+            type="checkbox"
+            aria-label={`Select ${row.original.key}`}
+            checked={selectionRef.current.includes(row.original.itemId)}
+            onClick={(e) => e.stopPropagation()}
+            onChange={() => toggleRef.current(row.original.itemId, true)}
+          />
+        ),
+      },
+      {
+        id: 'key',
+        header: 'ID',
+        accessorFn: (i) => i.number,
+        size: 84,
+        cell: ({ row }) => <span className="mono muted">{row.original.key}</span>,
+      },
     ];
     if (prioF) {
       cols.push({
@@ -49,7 +99,11 @@ export function ListView() {
         return (
           <span className="title-cell">
             {row.original.state === 'CLOSED' &&
-              (row.original.stateReason === 'COMPLETED' ? <CheckCircle2 size={13} style={{ color: 'var(--c-purple)', flex: 'none' }} /> : <XCircle size={13} className="faint" style={{ flex: 'none' }} />)}
+              (row.original.stateReason === 'COMPLETED' ? (
+                <CheckCircle2 size={13} style={{ color: 'var(--c-purple)', flex: 'none' }} />
+              ) : (
+                <XCircle size={13} className="faint" style={{ flex: 'none' }} />
+              ))}
             <span className="title">{row.original.title}</span>
             {t && (
               <Tag color={t.color} plain>
@@ -60,8 +114,22 @@ export function ListView() {
         );
       },
     });
-    if (statusF) cols.push({ id: 'status', header: 'Status', size: 150, accessorFn: (i) => optionRank(schema, STATUS, i), cell: ({ row }) => <SelectCell item={row.original} field={statusF} /> });
-    if (teamF && filters.team === null) cols.push({ id: 'team', header: 'Team', size: 120, accessorFn: (i) => optionRank(schema, TEAM, i), cell: ({ row }) => <SelectCell item={row.original} field={teamF} /> });
+    if (statusF)
+      cols.push({
+        id: 'status',
+        header: 'Status',
+        size: 150,
+        accessorFn: (i) => optionRank(schema, STATUS, i),
+        cell: ({ row }) => <SelectCell item={row.original} field={statusF} />,
+      });
+    if (teamF && filters.team === null)
+      cols.push({
+        id: 'team',
+        header: 'Team',
+        size: 120,
+        accessorFn: (i) => optionRank(schema, TEAM, i),
+        cell: ({ row }) => <SelectCell item={row.original} field={teamF} />,
+      });
     cols.push({
       id: 'assignees',
       header: 'Assignee',
@@ -69,11 +137,24 @@ export function ListView() {
       accessorFn: (i) => i.assignees[0]?.login ?? '',
       cell: ({ row }) => <AvatarStack people={row.original.assignees} size={20} />,
     });
-    cols.push({ id: 'updated', header: 'Updated', size: 80, accessorFn: (i) => i.updatedAt, cell: ({ row }) => <span className="faint">{timeAgo(row.original.updatedAt)}</span> });
+    cols.push({
+      id: 'updated',
+      header: 'Updated',
+      size: 80,
+      accessorFn: (i) => i.updatedAt,
+      cell: ({ row }) => <span className="faint">{timeAgo(row.original.updatedAt)}</span>,
+    });
     return cols;
   }, [schema, filters.team]);
 
-  const table = useReactTable({ data: items, columns, state: { sorting }, onSortingChange: setSorting, getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel() });
+  const table = useReactTable({
+    data: items,
+    columns,
+    state: { sorting },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+  });
   const rows = table.getRowModel().rows;
 
   useEffect(() => {
@@ -101,7 +182,10 @@ export function ListView() {
 
   return (
     <>
-      <ViewHeader title="List" count={board.data ? items.length : undefined} />
+      <ViewHeader
+        title={filters.archived ? 'Archived' : 'List'}
+        count={board.data ? items.length : undefined}
+      />
       {board.isError && (
         <div className="error-banner">
           <span>Couldn’t load issues: {(board.error as Error).message}</span>
@@ -118,7 +202,11 @@ export function ListView() {
         </div>
       ) : rows.length === 0 ? (
         <div className="empty-view">
-          <span>{board.data?.items.length === 0 ? 'No issues yet.' : 'No issues match the current filters.'}</span>
+          <span>
+            {board.data?.items.length === 0
+              ? 'No issues yet.'
+              : 'No issues match the current filters.'}
+          </span>
           <Button size="sm" onClick={() => setNewIssueOpen(true)}>
             New issue
           </Button>
@@ -135,9 +223,23 @@ export function ListView() {
               {table.getHeaderGroups().map((hg) => (
                 <tr key={hg.id}>
                   {hg.headers.map((h) => (
-                    <th key={h.id} onClick={h.column.getToggleSortingHandler()} aria-sort={h.column.getIsSorted() === 'asc' ? 'ascending' : h.column.getIsSorted() === 'desc' ? 'descending' : 'none'}>
+                    <th
+                      key={h.id}
+                      onClick={h.column.getToggleSortingHandler()}
+                      aria-sort={
+                        h.column.getIsSorted() === 'asc'
+                          ? 'ascending'
+                          : h.column.getIsSorted() === 'desc'
+                            ? 'descending'
+                            : 'none'
+                      }
+                    >
                       {flexRender(h.column.columnDef.header, h.getContext())}
-                      {h.column.getIsSorted() && <span className="arrow">{h.column.getIsSorted() === 'asc' ? '▲' : '▼'}</span>}
+                      {h.column.getIsSorted() && (
+                        <span className="arrow">
+                          {h.column.getIsSorted() === 'asc' ? '▲' : '▼'}
+                        </span>
+                      )}
                     </th>
                   ))}
                 </tr>
@@ -147,14 +249,28 @@ export function ListView() {
               {rows.map((row, idx) => (
                 <tr
                   key={row.id}
-                  className={`${idx === cursor ? 'focused' : ''} ${row.original.state === 'CLOSED' ? 'closed' : ''} ${row.original.key === openKey ? 'focused' : ''}`}
-                  onClick={() => {
+                  className={`${idx === cursor ? 'focused' : ''} ${row.original.state === 'CLOSED' ? 'closed' : ''} ${row.original.key === openKey ? 'focused' : ''} ${selection.includes(row.original.itemId) ? 'selected' : ''}`}
+                  onClick={(e) => {
                     setCursor(idx);
+                    if (e.shiftKey && anchor !== null) {
+                      const [from, to] = anchor < idx ? [anchor, idx] : [idx, anchor];
+                      const ids = rows.slice(from, to + 1).map((r) => r.original.itemId);
+                      setSelection((prev) => [...new Set([...prev, ...ids])]);
+                      return;
+                    }
+                    if (e.metaKey || e.ctrlKey) {
+                      setAnchor(idx);
+                      toggleSelected(row.original.itemId, true);
+                      return;
+                    }
+                    setAnchor(idx);
                     openIssue(row.original.key);
                   }}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                    <td key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
                   ))}
                 </tr>
               ))}
@@ -162,6 +278,7 @@ export function ListView() {
           </table>
         </div>
       )}
+      <BulkBar />
     </>
   );
 }

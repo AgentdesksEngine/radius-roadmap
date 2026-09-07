@@ -1,0 +1,29 @@
+.bulk-bar {
+  position: fixed;
+  bottom: 20px;
+  left: calc(50% + var(--sidebar-w) / 2);
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 10px;
+  background: var(--bg);
+  box-shadow: var(--shadow-pop);
+  z-index: 45;
+  animation: pop-in 0.14s ease-out;
+  max-width: calc(100vw - 32px);
+  overflow-x: auto;
+}
+.bulk-bar strong {
+  font-weight: 500;
+  font-size: 12.5px;
+  white-space: nowrap;
+  margin-right: 4px;
+}
+
+@media (max-width: 800px) {
+  .bulk-bar {
+    left: 50%;
+  }
+}
