@@ -50,7 +50,7 @@ export function Sidebar() {
     ? board.items.filter((i) => i.state === 'OPEN' && !i.isArchived).length
     : 0;
   const intakeCount = board ? intakeItems(board.items).length : 0;
-  const me = auth?.user?.login;
+  const me = auth?.user?.id;
   const myIssuesActive =
     me != null && filters.assignees.length === 1 && filters.assignees[0] === me;
 
@@ -223,12 +223,12 @@ export function Sidebar() {
           <MenuTrigger asChild>
             <button className="user">
               <Avatar person={auth?.user ?? null} size={20} />
-              <span className="truncate">{auth?.user?.name || auth?.user?.login}</span>
+              <span className="truncate">{auth?.user?.name || auth?.user?.email}</span>
             </button>
           </MenuTrigger>
           <MenuContent side="top">
             <MenuItem onSelect={() => window.open(schema?.url, '_blank')}>
-              <ExternalLink /> Open project in GitHub
+              <ExternalLink /> Open project home
             </MenuItem>
             <MenuItem onSelect={() => qc.invalidateQueries()}>Refresh data</MenuItem>
             <MenuSeparator />

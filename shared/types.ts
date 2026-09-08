@@ -59,9 +59,10 @@ export interface ProjectSchema {
 }
 
 export interface Person {
-  login: string;
-  avatarUrl: string;
-  name?: string | null;
+  /** profiles.id */
+  id: string;
+  name: string | null;
+  avatarUrl: string | null;
 }
 
 export type FieldValue =
@@ -140,19 +141,22 @@ export interface BoardData {
 }
 
 export interface SessionUser {
-  login: string;
-  avatarUrl: string;
+  /** profiles.id */
+  id: string;
+  email: string;
   name: string | null;
+  avatarUrl: string | null;
 }
 
-export interface OrgMember extends Person {
-  id: string;
-}
+/** Same shape as Person; kept as a distinct name for call sites that mean "assignable user". */
+export type OrgMember = Person;
 
 export interface AuthStatus {
   user: SessionUser | null;
   oauthConfigured: boolean;
   devLoginAvailable: boolean;
+  /** Set when a real Supabase session existed but the account was not allowed in. */
+  deniedEmail?: string;
 }
 
 export interface UpdateIssueRequest {
@@ -160,7 +164,7 @@ export interface UpdateIssueRequest {
   body?: string;
   state?: IssueState;
   stateReason?: IssueStateReason;
-  assigneeLogins?: string[];
+  assigneeIds?: string[];
 }
 
 export interface IssueComment {
@@ -221,7 +225,7 @@ export interface CreateIssueRequest {
   body?: string;
   /** field name -> write value, applied after the item is added to the project */
   fields?: Record<string, FieldWriteValue>;
-  assigneeLogins?: string[];
+  assigneeIds?: string[];
   labelNames?: string[];
 }
 

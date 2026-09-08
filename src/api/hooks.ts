@@ -48,7 +48,8 @@ export function useBoard(enabled = true) {
     queryKey: keys.board,
     queryFn: () => get<BoardData>('/api/project/items'),
     staleTime: 30_000,
-    refetchInterval: 60_000,
+    // Live updates come from useBoardRealtime() (Supabase Realtime on the issues table)
+    // instead of polling; window-focus refetch stays as a cheap catch-up net.
     refetchOnWindowFocus: true,
     enabled,
   });
@@ -72,7 +73,7 @@ export function useActivity(issueId: string | undefined) {
 }
 
 /** Replace one item in the cached board (or append if new). */
-function upsertItem(board: BoardData | undefined, item: BoardItem): BoardData | undefined {
+export function upsertItem(board: BoardData | undefined, item: BoardItem): BoardData | undefined {
   if (!board) return board;
   const idx = board.items.findIndex((i) => i.itemId === item.itemId);
   const items =

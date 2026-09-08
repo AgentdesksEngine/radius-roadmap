@@ -54,7 +54,7 @@ export function NewIssueDialog() {
     const fields: Record<string, FieldWriteValue> = {};
     for (const [name, id] of Object.entries(picks)) fields[name] = { singleSelectOptionId: id };
     create.mutate(
-      { title: t, body: body.trim() || undefined, fields, assigneeLogins: assignee ? [assignee.login] : undefined },
+      { title: t, body: body.trim() || undefined, fields, assigneeIds: assignee ? [assignee.id] : undefined },
       {
         onSuccess: (item) => {
           toast.success(`Created ${item.key}`);
@@ -102,15 +102,15 @@ export function NewIssueDialog() {
             );
           })}
           <Picker
-            items={(members ?? []).map((m) => ({ id: m.login, label: m.name || m.login, keywords: [m.login], icon: <Avatar person={m} size={16} /> }))}
-            value={assignee?.login ?? null}
-            onSelect={(id) => setAssignee(members?.find((m) => m.login === id) ?? null)}
+            items={(members ?? []).map((m) => ({ id: m.id, label: m.name || 'Unknown', keywords: m.name ? [m.name] : [], icon: <Avatar person={m} size={16} /> }))}
+            value={assignee?.id ?? null}
+            onSelect={(id) => setAssignee(members?.find((m) => m.id === id) ?? null)}
             onClear={() => setAssignee(null)}
             clearLabel="Unassigned"
             placeholder="Assignee…"
           >
             <Button size="sm" variant={assignee ? 'default' : 'ghost'} icon={<Avatar person={assignee} size={14} />}>
-              {assignee ? assignee.name || assignee.login : 'Assignee'}
+              {assignee ? assignee.name || 'Unknown' : 'Assignee'}
             </Button>
           </Picker>
         </div>

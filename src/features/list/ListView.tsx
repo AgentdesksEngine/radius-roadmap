@@ -134,7 +134,7 @@ export function ListView() {
       id: 'assignees',
       header: 'Assignee',
       size: 90,
-      accessorFn: (i) => i.assignees[0]?.login ?? '',
+      accessorFn: (i) => i.assignees[0]?.name ?? '',
       cell: ({ row }) => <AvatarStack people={row.original.assignees} size={20} />,
     });
     cols.push({

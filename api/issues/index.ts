@@ -1,9 +1,7 @@
 import { z } from 'zod';
+import { createIssue } from '../_lib/db/board';
 import { HttpError, readJson, route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { GitHubClient } from '../_lib/github/gql';
-import { createIssue } from '../_lib/github/board';
-import { cacheItems } from '../_lib/board-cache';
+import { requireUser } from '../_lib/session';
 
 const Body = z.object({
   title: z.string().trim().min(1).max(256),
@@ -21,17 +19,16 @@ const Body = z.object({
       ]),
     )
     .optional(),
-  assigneeLogins: z.array(z.string()).optional(),
+  assigneeIds: z.array(z.string()).optional(),
   labelNames: z.array(z.string()).optional(),
 });
 
 export default route({
   POST: async (req, res) => {
-    const { accessToken } = await requireToken(req, res);
+    const { profileId } = await requireUser(req, res);
     const parsed = Body.safeParse(readJson(req));
     if (!parsed.success) throw new HttpError(400, 'Invalid body', parsed.error.issues);
-    const item = await createIssue(new GitHubClient(accessToken), parsed.data);
-    cacheItems([item]);
+    const item = await createIssue(profileId, parsed.data);
     res.status(201).json(item);
   },
 });

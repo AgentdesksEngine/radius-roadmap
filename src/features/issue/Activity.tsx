@@ -147,7 +147,7 @@ export function Activity({ item }: { item: BoardItem }) {
             <Avatar person={e.actor} size={22} />
             <div style={{ minWidth: 0, flex: 1 }}>
               <div className="comment-head">
-                <b>{e.actor?.login ?? 'ghost'}</b>
+                <b>{e.actor?.name ?? 'ghost'}</b>
                 <span className="faint" title={formatDateTime(e.createdAt)}>
                   {timeAgo(e.createdAt)}
                 </span>
@@ -195,7 +195,7 @@ function EventRow({ event }: { event: ActivityEvent }) {
       <span className="event-icon">{d.icon}</span>
       <Avatar person={event.actor} size={16} />
       <span className="truncate">
-        <b>{event.actor?.login ?? 'someone'}</b> {d.text}
+        <b>{event.actor?.name ?? 'someone'}</b> {d.text}
       </span>
       <span className="faint" title={formatDateTime(event.createdAt)}>
         {timeAgo(event.createdAt)}

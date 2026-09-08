@@ -95,21 +95,17 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
       {
         issueId: item.issueId,
         itemId: item.itemId,
-        assigneeLogins: next.map((p) => p.login),
+        assigneeIds: next.map((p) => p.id),
         optimisticAssignees: next,
       },
       'assignees',
     );
 
-  const toggleAssignee = (login: string) => {
-    const has = item.assignees.some((a) => a.login === login);
-    const person = members?.find((m) => m.login === login);
-    if (has) setAssignees(item.assignees.filter((a) => a.login !== login));
-    else if (person)
-      setAssignees([
-        ...item.assignees,
-        { login: person.login, avatarUrl: person.avatarUrl, name: person.name },
-      ]);
+  const toggleAssignee = (id: string) => {
+    const has = item.assignees.some((a) => a.id === id);
+    const person = members?.find((m) => m.id === id);
+    if (has) setAssignees(item.assignees.filter((a) => a.id !== id));
+    else if (person) setAssignees([...item.assignees, person]);
   };
 
   const fields = schema ? customFields(schema) : [];
@@ -226,7 +222,13 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
             </MenuItem>
           </MenuContent>
         </Menu>
-        <IconButton label="Open in GitHub" onClick={() => window.open(item.url, '_blank')}>
+        <IconButton
+          label="Copy link"
+          onClick={() => {
+            navigator.clipboard.writeText(item.url);
+            toast.success('Link copied');
+          }}
+        >
           <ExternalLink />
         </IconButton>
         <IconButton label="Close" shortcut="Esc" onClick={onClose}>
@@ -313,12 +315,12 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
           <span className="label">Assignees</span>
           <Picker
             items={(members ?? []).map((m) => ({
-              id: m.login,
-              label: m.name || m.login,
-              keywords: [m.login],
+              id: m.id,
+              label: m.name || 'Unknown',
+              keywords: m.name ? [m.name] : [],
               icon: <Avatar person={m} size={16} />,
             }))}
-            value={item.assignees.map((a) => a.login)}
+            value={item.assignees.map((a) => a.id)}
             multiple
             onSelect={toggleAssignee}
             placeholder="Assign to…"
@@ -328,11 +330,11 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
                 <span style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap' }}>
                   {item.assignees.map((a) => (
                     <span
-                      key={a.login}
+                      key={a.id}
                       style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
                     >
                       <Avatar person={a} size={16} />
-                      {a.name || a.login}
+                      {a.name || 'Unknown'}
                     </span>
                   ))}
                 </span>
@@ -363,7 +365,7 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
         </div>
 
         <div className="meta-line">
-          Opened {timeAgo(item.createdAt)} ago by {item.author?.login ?? 'unknown'} · updated{' '}
+          Opened {timeAgo(item.createdAt)} ago by {item.author?.name ?? 'unknown'} · updated{' '}
           {formatDateTime(item.updatedAt)}
           {item.closedAt && ` · closed ${formatDateTime(item.closedAt)}`}
         </div>

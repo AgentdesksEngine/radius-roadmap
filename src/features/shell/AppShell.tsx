@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { useBoard, useSchema } from '@/api/hooks';
+import { useBoardRealtime } from '@/api/realtime';
 import { Button } from '@/components/ui/Button';
 import { Sidebar } from './Sidebar';
 import { useUi } from './state';
@@ -17,6 +18,7 @@ function isTyping(e: KeyboardEvent) {
 export function AppShell() {
   const schema = useSchema();
   useBoard(Boolean(schema.data));
+  useBoardRealtime(Boolean(schema.data));
   const {
     openKey,
     openIssue,

@@ -1,9 +1,7 @@
 import { z } from 'zod';
+import { BULK_LIMIT, setFieldOnItems } from '../_lib/db/board';
 import { HttpError, readJson, route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { GitHubClient } from '../_lib/github/gql';
-import { BULK_LIMIT, setFieldOnItems } from '../_lib/github/board';
-import { cacheItems } from '../_lib/board-cache';
+import { requireUser } from '../_lib/session';
 
 const Body = z.object({
   itemIds: z.array(z.string().min(1)).min(1).max(BULK_LIMIT),
@@ -21,11 +19,10 @@ const Body = z.object({
 /** POST /api/items/bulk-field — one field value across a selection. Partial success is normal. */
 export default route({
   POST: async (req, res) => {
-    const { accessToken } = await requireToken(req, res);
+    const { profileId } = await requireUser(req, res);
     const parsed = Body.safeParse(readJson(req));
     if (!parsed.success) throw new HttpError(400, 'Invalid body', parsed.error.issues);
-    const result = await setFieldOnItems(new GitHubClient(accessToken), parsed.data);
-    cacheItems(result.items);
+    const result = await setFieldOnItems(profileId, parsed.data);
     res.status(200).json(result);
   },
 });

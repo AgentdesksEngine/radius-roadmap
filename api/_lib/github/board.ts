@@ -1,31 +1,140 @@
 /**
- * The one place that knows how the GitHub Project is shaped.
- * API routes, scripts and any future webhook handler all go through here.
+ * The one place that knows how the (now retired) GitHub Project was shaped.
+ *
+ * Kept only as the read path for the one-off Supabase migration (scripts/migrate-github-to-
+ * supabase.ts) and the dump-schema/provision-fields dev scripts — the live app routes under
+ * api/ no longer import this module (see api/_lib/db/board.ts instead). Deleted in Phase 4 of
+ * the cutover plan once the migration is done.
+ *
+ * Its types are intentionally local (GitHub* prefixed) rather than imported from
+ * shared/types.ts: that file now describes the Postgres-backed app contract (id-based
+ * `GitHubPerson`, `assigneeIds`, ...), which no longer matches GitHub's login-based shapes.
  */
 import type {
-  ActivityEvent,
-  BoardData,
-  BoardItem,
-  BulkResult,
-  CreateIssueRequest,
   FieldOption,
   FieldValue,
   FieldWriteValue,
-  IssueComment,
   IssueState,
   IssueStateReason,
-  OrgMember,
-  IssueRef,
-  Person,
   ProjectField,
   ProjectSchema,
   Reaction,
   ReactionContent,
-  SubIssueProgress,
 } from '../../../shared/types';
 import { env } from '../env';
 import { HttpError } from '../http';
 import type { GitHubClient } from './gql';
+
+export interface GitHubPerson {
+  login: string;
+  avatarUrl: string;
+  name?: string | null;
+}
+
+export interface GitHubIssueRef {
+  id: string;
+  number: number;
+  key: string;
+  title: string;
+  state: IssueState;
+  stateReason: IssueStateReason | null;
+  url: string;
+  assignees: GitHubPerson[];
+}
+
+export interface GitHubSubIssueProgress {
+  total: number;
+  completed: number;
+  percent: number;
+}
+
+export interface GitHubBoardItem {
+  itemId: string;
+  issueId: string;
+  number: number;
+  key: string;
+  title: string;
+  body: string;
+  state: IssueState;
+  stateReason: IssueStateReason | null;
+  url: string;
+  repository: string;
+  createdAt: string;
+  updatedAt: string;
+  closedAt: string | null;
+  author: GitHubPerson | null;
+  assignees: GitHubPerson[];
+  labels: { name: string; color: string }[];
+  commentCount: number;
+  isArchived: boolean;
+  parent: GitHubIssueRef | null;
+  subIssues: GitHubSubIssueProgress;
+  reactions: Reaction[];
+  fields: Record<string, FieldValue>;
+}
+
+export interface GitHubBoardData {
+  items: GitHubBoardItem[];
+  fetchedAt: string;
+}
+
+export interface GitHubIssueComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  author: GitHubPerson | null;
+  reactions: Reaction[];
+}
+
+export type GitHubActivityKind =
+  | 'comment'
+  | 'closed'
+  | 'reopened'
+  | 'assigned'
+  | 'unassigned'
+  | 'labeled'
+  | 'unlabeled'
+  | 'renamed'
+  | 'status'
+  | 'referenced'
+  | 'sub-issue-added'
+  | 'sub-issue-removed'
+  | 'parent-added'
+  | 'parent-removed'
+  | 'duplicate';
+
+export interface GitHubActivityEvent {
+  id: string;
+  kind: GitHubActivityKind;
+  createdAt: string;
+  actor: GitHubPerson | null;
+  body?: string;
+  reactions?: Reaction[];
+  detail?: string;
+  from?: string;
+  to?: string;
+  url?: string;
+}
+
+export interface GitHubOrgMember {
+  id: string;
+  login: string;
+  avatarUrl: string;
+  name?: string | null;
+}
+
+export interface GitHubCreateIssueRequest {
+  title: string;
+  body?: string;
+  fields?: Record<string, FieldWriteValue>;
+  assigneeLogins?: string[];
+  labelNames?: string[];
+}
+
+export interface GitHubBulkResult {
+  items: GitHubBoardItem[];
+  failed: { itemId: string; error: string }[];
+}
 
 // ---------- GraphQL documents ----------
 
@@ -361,7 +470,7 @@ const MOVE_ITEM_MUTATION = /* GraphQL */ `
 const ADD_REACTION_MUTATION = /* GraphQL */ `
   mutation AddReaction($subjectId: ID!, $content: ReactionContent!) {
     addReaction(input: { subjectId: $subjectId, content: $content }) {
-      subject { ... on Issue { ${REACTIONS} } ... on IssueComment { ${REACTIONS} } }
+      subject { ... on Issue { ${REACTIONS} } ... on GitHubIssueComment { ${REACTIONS} } }
     }
   }
 `;
@@ -369,7 +478,7 @@ const ADD_REACTION_MUTATION = /* GraphQL */ `
 const REMOVE_REACTION_MUTATION = /* GraphQL */ `
   mutation RemoveReaction($subjectId: ID!, $content: ReactionContent!) {
     removeReaction(input: { subjectId: $subjectId, content: $content }) {
-      subject { ... on Issue { ${REACTIONS} } ... on IssueComment { ${REACTIONS} } }
+      subject { ... on Issue { ${REACTIONS} } ... on GitHubIssueComment { ${REACTIONS} } }
     }
   }
 `;
@@ -434,7 +543,7 @@ const ACTIVITY_QUERY = /* GraphQL */ `
         ) {
           nodes {
             __typename
-            ... on IssueComment { id createdAt body author { login avatarUrl } ${REACTIONS} }
+            ... on GitHubIssueComment { id createdAt body author { login avatarUrl } ${REACTIONS} }
             ... on ClosedEvent { id createdAt stateReason ${ACTOR} }
             ... on ReopenedEvent { id createdAt ${ACTOR} }
             ... on AssignedEvent { id createdAt ${ACTOR} assignee { ... on User { login } } }
@@ -510,8 +619,8 @@ interface RawIssue {
   createdAt: string;
   updatedAt: string;
   closedAt: string | null;
-  author: Person | null;
-  assignees: { nodes: Person[] };
+  author: GitHubPerson | null;
+  assignees: { nodes: GitHubPerson[] };
   labels: { nodes: { name: string; color: string }[] };
   comments: { totalCount: number };
   repository: { nameWithOwner: string };
@@ -527,7 +636,7 @@ interface RawIssueRef {
   state: IssueState;
   stateReason: IssueStateReason | null;
   url: string;
-  assignees: { nodes: Person[] };
+  assignees: { nodes: GitHubPerson[] };
 }
 
 interface RawReactionGroup {
@@ -623,7 +732,7 @@ function normalizeReactions(groups: RawReactionGroup[] | null | undefined): Reac
 function normalizeIssueRef(
   raw: RawIssueRef | null | undefined,
   keyPrefix: string,
-): IssueRef | null {
+): GitHubIssueRef | null {
   if (!raw) return null;
   return {
     id: raw.id,
@@ -637,7 +746,7 @@ function normalizeIssueRef(
   };
 }
 
-function normalizeSubIssues(raw: RawIssue['subIssuesSummary']): SubIssueProgress {
+function normalizeSubIssues(raw: RawIssue['subIssuesSummary']): GitHubSubIssueProgress {
   return {
     total: raw?.total ?? 0,
     completed: raw?.completed ?? 0,
@@ -645,7 +754,7 @@ function normalizeSubIssues(raw: RawIssue['subIssuesSummary']): SubIssueProgress
   };
 }
 
-export function normalizeItem(raw: RawItem, keyPrefix: string): BoardItem | null {
+export function normalizeItem(raw: RawItem, keyPrefix: string): GitHubBoardItem | null {
   const c = raw.content;
   if (!c || c.__typename !== 'Issue') return null; // drafts and PRs are out of scope for v1
   const issue = c as RawIssue;
@@ -728,9 +837,9 @@ export function normalizeItem(raw: RawItem, keyPrefix: string): BoardItem | null
   };
 }
 
-export async function getBoard(gh: GitHubClient): Promise<BoardData> {
+export async function getBoard(gh: GitHubClient): Promise<GitHubBoardData> {
   const e = env();
-  const items: BoardItem[] = [];
+  const items: GitHubBoardItem[] = [];
   let after: string | null = null;
   for (let page = 0; page < 50; page++) {
     const data: {
@@ -757,7 +866,7 @@ export async function getBoard(gh: GitHubClient): Promise<BoardData> {
 }
 
 export interface BoardDelta {
-  items: BoardItem[];
+  items: GitHubBoardItem[];
   /**
    * False when more had changed than the page budget covers — past a certain volume a
    * full re-read is both cheaper and simpler than paging through the difference.
@@ -772,7 +881,7 @@ export interface BoardDelta {
 export async function getBoardSince(gh: GitHubClient, since: string, maxPages = 4): Promise<BoardDelta> {
   const e = env();
   const schema = await getSchema(gh);
-  const items: BoardItem[] = [];
+  const items: GitHubBoardItem[] = [];
   let after: string | null = null;
   for (let page = 0; page < maxPages; page++) {
     const data: {
@@ -800,7 +909,7 @@ export async function getBoardSince(gh: GitHubClient, since: string, maxPages = 
   return { items, complete: false };
 }
 
-export async function getItem(gh: GitHubClient, itemId: string): Promise<BoardItem> {
+export async function getItem(gh: GitHubClient, itemId: string): Promise<GitHubBoardItem> {
   const data = await gh.graphql<{ node: RawItem | null }>(ITEM_QUERY, { id: itemId });
   const item = data.node ? normalizeItem(data.node, env().ISSUE_KEY_PREFIX) : null;
   if (!item) throw new HttpError(404, 'Item not found');
@@ -853,7 +962,7 @@ function statusFieldOf(schema: ProjectSchema): ProjectField | undefined {
 export async function setItemFieldAndSync(
   gh: GitHubClient,
   args: { itemId: string; fieldId: string; value: FieldWriteValue },
-): Promise<BoardItem> {
+): Promise<GitHubBoardItem> {
   await setItemField(gh, args);
   let item = await getItem(gh, args.itemId);
   const schema = await getSchema(gh);
@@ -877,7 +986,7 @@ export async function setItemFieldAndSync(
  * After an explicit open/close, move Status to a matching option (Done / Canceled / Todo)
  * when the current one contradicts the new state.
  */
-export async function syncStatusToState(gh: GitHubClient, itemId: string): Promise<BoardItem> {
+export async function syncStatusToState(gh: GitHubClient, itemId: string): Promise<GitHubBoardItem> {
   const schema = await getSchema(gh);
   const statusField = statusFieldOf(schema);
   let item = await getItem(gh, itemId);
@@ -923,7 +1032,7 @@ export function resolveFieldWrites(schema: ProjectSchema, writes: Record<string,
   });
 }
 
-export async function createIssue(gh: GitHubClient, req: CreateIssueRequest): Promise<BoardItem> {
+export async function createIssue(gh: GitHubClient, req: GitHubCreateIssueRequest): Promise<GitHubBoardItem> {
   const schema = await getSchema(gh);
   const writes = resolveFieldWrites(schema, req.fields ?? {});
 
@@ -1023,9 +1132,9 @@ export async function setIssueState(
 
 // ---------- Comments ----------
 
-type RawComment = Omit<IssueComment, 'reactions'> & { reactionGroups: RawReactionGroup[] | null };
+type RawComment = Omit<GitHubIssueComment, 'reactions'> & { reactionGroups: RawReactionGroup[] | null };
 
-const normalizeComment = (c: RawComment): IssueComment => ({
+const normalizeComment = (c: RawComment): GitHubIssueComment => ({
   id: c.id,
   body: c.body,
   createdAt: c.createdAt,
@@ -1033,7 +1142,7 @@ const normalizeComment = (c: RawComment): IssueComment => ({
   reactions: normalizeReactions(c.reactionGroups),
 });
 
-export async function getComments(gh: GitHubClient, issueId: string): Promise<IssueComment[]> {
+export async function getComments(gh: GitHubClient, issueId: string): Promise<GitHubIssueComment[]> {
   const data = await gh.graphql<{ node: { comments?: { nodes: RawComment[] } } | null }>(
     COMMENTS_QUERY,
     { id: issueId },
@@ -1046,7 +1155,7 @@ export async function addComment(
   gh: GitHubClient,
   issueId: string,
   body: string,
-): Promise<IssueComment> {
+): Promise<GitHubIssueComment> {
   const data = await gh.graphql<{ addComment: { commentEdge: { node: RawComment } } }>(
     ADD_COMMENT_MUTATION,
     {
@@ -1063,7 +1172,7 @@ export async function setItemArchived(
   gh: GitHubClient,
   itemId: string,
   archived: boolean,
-): Promise<BoardItem> {
+): Promise<GitHubBoardItem> {
   const schema = await getSchema(gh);
   await gh.graphql(archived ? ARCHIVE_ITEM_MUTATION : UNARCHIVE_ITEM_MUTATION, {
     projectId: schema.projectId,
@@ -1109,8 +1218,8 @@ export const BULK_LIMIT = 100;
 export async function setFieldOnItems(
   gh: GitHubClient,
   args: { itemIds: string[]; fieldId: string; value: FieldWriteValue },
-): Promise<BulkResult> {
-  type Outcome = { ok: true; item: BoardItem } | { ok: false; itemId: string; error: string };
+): Promise<GitHubBulkResult> {
+  type Outcome = { ok: true; item: GitHubBoardItem } | { ok: false; itemId: string; error: string };
   const results = await mapLimit<string, Outcome>(args.itemIds, 4, async (itemId) => {
     try {
       return {
@@ -1166,8 +1275,8 @@ interface RawTimelineNode {
   __typename: string;
   id: string;
   createdAt: string;
-  actor?: Person | null;
-  author?: Person | null;
+  actor?: GitHubPerson | null;
+  author?: GitHubPerson | null;
   body?: string;
   reactionGroups?: RawReactionGroup[] | null;
   stateReason?: IssueStateReason | null;
@@ -1184,11 +1293,11 @@ interface RawTimelineNode {
   canonical?: { number?: number; title?: string } | null;
 }
 
-function normalizeActivity(node: RawTimelineNode, keyPrefix: string): ActivityEvent | null {
+function normalizeActivity(node: RawTimelineNode, keyPrefix: string): GitHubActivityEvent | null {
   const base = { id: node.id, createdAt: node.createdAt, actor: node.actor ?? null };
   const key = (n: number | undefined) => (n == null ? undefined : `${keyPrefix}-${n}`);
-  const kinds: Record<string, () => ActivityEvent | null> = {
-    IssueComment: () => ({
+  const kinds: Record<string, () => GitHubActivityEvent | null> = {
+    GitHubIssueComment: () => ({
       ...base,
       kind: 'comment',
       actor: node.author ?? null,
@@ -1252,7 +1361,7 @@ function normalizeActivity(node: RawTimelineNode, keyPrefix: string): ActivityEv
   return kinds[node.__typename]?.() ?? null;
 }
 
-export async function getActivity(gh: GitHubClient, issueId: string): Promise<ActivityEvent[]> {
+export async function getActivity(gh: GitHubClient, issueId: string): Promise<GitHubActivityEvent[]> {
   const data = await gh.graphql<{ node: { timelineItems?: { nodes: RawTimelineNode[] } } | null }>(
     ACTIVITY_QUERY,
     {
@@ -1263,25 +1372,25 @@ export async function getActivity(gh: GitHubClient, issueId: string): Promise<Ac
   const prefix = env().ISSUE_KEY_PREFIX;
   return (data.node.timelineItems?.nodes ?? [])
     .map((n) => normalizeActivity(n, prefix))
-    .filter((e): e is ActivityEvent => e !== null)
+    .filter((e): e is GitHubActivityEvent => e !== null)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
 // ---------- Members ----------
 
-let membersCache: { at: number; value: OrgMember[] } | undefined;
+let membersCache: { at: number; value: GitHubOrgMember[] } | undefined;
 
-export async function getMembers(gh: GitHubClient): Promise<OrgMember[]> {
+export async function getMembers(gh: GitHubClient): Promise<GitHubOrgMember[]> {
   if (membersCache && Date.now() - membersCache.at < SCHEMA_TTL_MS) return membersCache.value;
   const e = env();
-  const out: OrgMember[] = [];
+  const out: GitHubOrgMember[] = [];
   let after: string | null = null;
   for (let page = 0; page < 10; page++) {
     const data: {
       organization: {
         membersWithRole: {
           pageInfo: { hasNextPage: boolean; endCursor: string | null };
-          nodes: OrgMember[];
+          nodes: GitHubOrgMember[];
         };
       } | null;
     } = await gh.graphql(MEMBERS_QUERY, { org: e.GITHUB_ORG, after });

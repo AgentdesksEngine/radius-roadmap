@@ -113,10 +113,10 @@ export function groupItems(items: BoardItem[], groupBy: string, schema: ProjectS
         continue;
       }
       for (const a of it.assignees) {
-        let g = map.get(a.login);
+        let g = map.get(a.id);
         if (!g) {
-          g = { key: a.login, label: a.name || a.login, items: [] };
-          map.set(a.login, g);
+          g = { key: a.id, label: a.name || 'Unknown', items: [] };
+          map.set(a.id, g);
         }
         g.items.push(it);
       }
@@ -159,7 +159,7 @@ export interface Filters {
   state: StateFilter;
   /** field name -> set of option names */
   select: Record<string, string[]>;
-  assignees: string[]; // logins, '__none' = unassigned
+  assignees: string[]; // profile ids, '__none' = unassigned
   query: string;
   /** Archived items are a separate world: true shows only them, false only the live board. */
   archived: boolean;
@@ -202,9 +202,7 @@ export function matchesQuery(item: BoardItem, q: string): boolean {
   if (key === q || key.endsWith(`-${q}`) || String(item.number) === q) return true;
   if (item.title.toLowerCase().includes(q)) return true;
   if (item.body.toLowerCase().includes(q)) return true;
-  return item.assignees.some(
-    (a) => a.login.toLowerCase().includes(q) || a.name?.toLowerCase().includes(q),
-  );
+  return item.assignees.some((a) => a.name?.toLowerCase().includes(q));
 }
 
 export function filterItems(items: BoardItem[], filters: Filters, now = Date.now()): BoardItem[] {
@@ -219,10 +217,8 @@ export function filterItems(items: BoardItem[], filters: Filters, now = Date.now
       if (!names.includes(v)) return false;
     }
     if (filters.assignees.length) {
-      const logins = it.assignees.map((a) => a.login);
-      const hit = filters.assignees.some((a) =>
-        a === '__none' ? logins.length === 0 : logins.includes(a),
-      );
+      const ids = it.assignees.map((a) => a.id);
+      const hit = filters.assignees.some((a) => (a === '__none' ? ids.length === 0 : ids.includes(a)));
       if (!hit) return false;
     }
     return matchesQuery(it, q);

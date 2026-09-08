@@ -41,9 +41,9 @@ export function FilterBar() {
   const assigneeItems: PickerItem[] = [
     { id: '__none', label: 'Unassigned', icon: <Avatar person={null} size={16} /> },
     ...(members ?? []).map((m) => ({
-      id: m.login,
-      label: m.name || m.login,
-      keywords: [m.login],
+      id: m.id,
+      label: m.name || 'Unknown',
+      keywords: m.name ? [m.name] : [],
       icon: <Avatar person={m} size={16} />,
     })),
   ];

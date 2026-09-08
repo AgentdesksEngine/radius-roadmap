@@ -99,7 +99,7 @@ const items = [
     number: 3,
     title: 'Crash on login',
     body: 'Stack trace mentions keychain',
-    assignees: [{ login: 'alice', avatarUrl: '' }],
+    assignees: [{ id: 'alice', name: 'Alice', avatarUrl: null }],
   }),
 ];
 
@@ -112,7 +112,7 @@ describe('groupItems', () => {
   });
   it('groups by assignee', () => {
     const groups = groupItems(items, 'Assignee', schema);
-    expect(groups.map((g) => g.label)).toEqual(['alice', 'Unassigned']);
+    expect(groups.map((g) => g.label)).toEqual(['Alice', 'Unassigned']);
   });
 });
 

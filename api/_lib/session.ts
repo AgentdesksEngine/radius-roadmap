@@ -1,62 +1,48 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { getIronSession, type SessionOptions } from 'iron-session';
 import type { SessionUser } from '../../shared/types';
-import { env } from './env';
 import { HttpError } from './http';
-import { refreshAccessToken } from './github/oauth';
+import { supabaseAdmin, supabaseForRequest } from './supabase';
 
-export interface SessionToken {
-  accessToken: string;
-  /** epoch ms; undefined when the token does not expire (PAT / dev login) */
-  expiresAt?: number;
-  refreshToken?: string;
-  refreshExpiresAt?: number;
+interface ProfileRow {
+  id: string;
+  email: string;
+  display_name: string | null;
+  avatar_url: string | null;
+  allowed: boolean;
 }
 
-export interface SessionData {
-  user?: SessionUser;
-  token?: SessionToken;
-  oauthState?: string;
-  returnTo?: string;
+export function toSessionUser(profile: ProfileRow): SessionUser {
+  return { id: profile.id, email: profile.email, name: profile.display_name, avatarUrl: profile.avatar_url };
 }
 
-export function sessionOptions(): SessionOptions {
-  const e = env();
-  return {
-    password: e.SESSION_SECRET,
-    cookieName: 'bt_session',
-    ttl: 60 * 60 * 24 * 30,
-    cookieOptions: {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: e.appUrl.startsWith('https://'),
-      path: '/',
-    },
-  };
-}
-
-export function getSession(req: VercelRequest, res: VercelResponse) {
-  return getIronSession<SessionData>(req, res, sessionOptions());
+export interface Authed {
+  user: SessionUser;
+  profileId: string;
 }
 
 /**
- * Returns a valid access token for the signed-in user, refreshing it when it is
- * about to expire. Throws 401 when there is no session.
+ * Verifies the Supabase session cookie and that the account is `allowed`. Throws 401 when
+ * there is no session, 403 when there is a session but the account isn't allowed in (and
+ * signs it out server-side so it doesn't sit half-authenticated).
  */
-export async function requireToken(req: VercelRequest, res: VercelResponse) {
-  const session = await getSession(req, res);
-  const { user, token } = session;
-  if (!user || !token) throw new HttpError(401, 'Not signed in');
+export async function requireUser(req: VercelRequest, res: VercelResponse): Promise<Authed> {
+  const supabase = supabaseForRequest(req, res);
+  const {
+    data: { user },
+    error,
+  } = await supabase.auth.getUser();
+  if (error || !user) throw new HttpError(401, 'Not signed in');
 
-  const soon = Date.now() + 60_000;
-  if (token.expiresAt && token.expiresAt < soon) {
-    if (!token.refreshToken || (token.refreshExpiresAt && token.refreshExpiresAt < Date.now())) {
-      session.destroy();
-      throw new HttpError(401, 'Session expired, sign in again');
-    }
-    const refreshed = await refreshAccessToken(token.refreshToken);
-    session.token = refreshed;
-    await session.save();
+  const { data: profile } = await supabaseAdmin()
+    .from('profiles')
+    .select('id, email, display_name, avatar_url, allowed')
+    .eq('auth_user_id', user.id)
+    .single<ProfileRow>();
+
+  if (!profile?.allowed) {
+    await supabase.auth.signOut();
+    throw new HttpError(403, 'Not an allowed account');
   }
-  return { session, user, accessToken: session.token!.accessToken };
+
+  return { user: toSessionUser(profile), profileId: profile.id };
 }

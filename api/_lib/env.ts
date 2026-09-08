@@ -1,19 +1,36 @@
 import { z } from 'zod';
 
+/**
+ * Superset of the Supabase-era vars the live API needs and the GitHub-era vars the
+ * one-off migration tooling (scripts/migrate-github-to-supabase.ts and its
+ * dump-schema/provision-fields/_lib.ts helpers) still needs to read the old board during
+ * the cutover. The GITHUB_* block goes away in Phase 4 of the cutover plan, once the
+ * migration is done and api/_lib/github/* is deleted for good.
+ */
 const schema = z.object({
+  // --- Supabase (live API) ---
+  DATABASE_URL: z.string().optional(),
+  SUPABASE_URL: z.string().optional(),
+  SUPABASE_ANON_KEY: z.string().optional(),
+  SUPABASE_SERVICE_ROLE_KEY: z.string().optional(),
+  ALLOWED_EMAIL_DOMAIN: z.string().default('radiusagent.com'),
+  DEV_LOGIN_EMAIL: z.string().optional(),
+  DEV_LOGIN_PASSWORD: z.string().optional(),
+
+  // --- GitHub (migration tooling only; unused by the live API) ---
   GITHUB_APP_ID: z.string().optional(),
   GITHUB_APP_CLIENT_ID: z.string().optional(),
   GITHUB_APP_CLIENT_SECRET: z.string().optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().optional(),
-  /** Shared secret configured on the App's webhook. Without it the webhook route refuses everything. */
   GITHUB_WEBHOOK_SECRET: z.string().optional(),
   GITHUB_ORG: z.string().default('AgentdesksEngine'),
   GITHUB_PROJECT_NUMBER: z.coerce.number().int().positive().default(6),
   GITHUB_ISSUES_REPO: z.string().default('radius-roadmap'),
-  ISSUE_KEY_PREFIX: z.string().default('RAD'),
-  SESSION_SECRET: z.string().min(32, 'SESSION_SECRET must be at least 32 characters'),
-  APP_URL: z.string().optional(),
   DEV_GITHUB_TOKEN: z.string().optional(),
+
+  // --- Shared ---
+  ISSUE_KEY_PREFIX: z.string().default('RAD'),
+  APP_URL: z.string().optional(),
   VERCEL_ENV: z.enum(['production', 'preview', 'development']).optional(),
   VERCEL_URL: z.string().optional(),
   NODE_ENV: z.string().optional(),
@@ -37,12 +54,18 @@ export function env(): Env {
   return cached;
 }
 
-export function requireOAuthEnv() {
+/** Live API routes call this to fail fast with a clear error instead of a null DATABASE_URL crash. */
+export function requireSupabaseEnv() {
   const e = env();
-  if (!e.GITHUB_APP_CLIENT_ID || !e.GITHUB_APP_CLIENT_SECRET) {
+  if (!e.DATABASE_URL || !e.SUPABASE_URL || !e.SUPABASE_ANON_KEY || !e.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error(
-      'GITHUB_APP_CLIENT_ID and GITHUB_APP_CLIENT_SECRET are not set. Create the GitHub App (see README) or use /api/auth/dev-login locally.',
+      'DATABASE_URL / SUPABASE_URL / SUPABASE_ANON_KEY / SUPABASE_SERVICE_ROLE_KEY are not all set. See .env.example.',
     );
   }
-  return { clientId: e.GITHUB_APP_CLIENT_ID, clientSecret: e.GITHUB_APP_CLIENT_SECRET };
+  return e as Env & {
+    DATABASE_URL: string;
+    SUPABASE_URL: string;
+    SUPABASE_ANON_KEY: string;
+    SUPABASE_SERVICE_ROLE_KEY: string;
+  };
 }
