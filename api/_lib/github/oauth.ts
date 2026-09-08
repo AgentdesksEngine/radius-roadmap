@@ -1,7 +1,7 @@
-import { env, requireOAuthEnv } from '../env';
-import { HttpError } from '../http';
-import type { SessionToken } from '../session';
-import { GitHubClient } from './gql';
+import { env, requireOAuthEnv } from '../env.js';
+import { HttpError } from '../http.js';
+import type { SessionToken } from '../session.js';
+import { GitHubClient } from './gql.js';
 
 const AUTHORIZE_URL = 'https://github.com/login/oauth/authorize';
 const TOKEN_URL = 'https://github.com/login/oauth/access_token';

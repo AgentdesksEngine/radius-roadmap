@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { HttpError, readJson, route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { GitHubClient } from '../_lib/github/gql';
-import { createIssue } from '../_lib/github/board';
-import { cacheItems } from '../_lib/board-cache';
+import { HttpError, readJson, route } from '../_lib/http.js';
+import { requireToken } from '../_lib/session.js';
+import { GitHubClient } from '../_lib/github/gql.js';
+import { createIssue } from '../_lib/github/board.js';
+import { cacheItems } from '../_lib/board-cache.js';
 
 const Body = z.object({
   title: z.string().trim().min(1).max(256),

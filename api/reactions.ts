@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { HttpError, readJson, route } from './_lib/http';
-import { requireToken } from './_lib/session';
-import { GitHubClient } from './_lib/github/gql';
-import { setReaction } from './_lib/github/board';
-import { invalidateBoard } from './_lib/board-cache';
+import { HttpError, readJson, route } from './_lib/http.js';
+import { requireToken } from './_lib/session.js';
+import { GitHubClient } from './_lib/github/gql.js';
+import { setReaction } from './_lib/github/board.js';
+import { invalidateBoard } from './_lib/board-cache.js';
 
 const Body = z.object({
   /** Issue or comment node id — GitHub takes both on the same mutation. */

@@ -1,7 +1,7 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { env } from '../_lib/env';
-import { HttpError, readRawBody, route } from '../_lib/http';
-import { invalidateBoard } from '../_lib/board-cache';
+import { env } from '../_lib/env.js';
+import { HttpError, readRawBody, route } from '../_lib/http.js';
+import { invalidateBoard } from '../_lib/board-cache.js';
 
 /** Vercel must not consume the stream: the signature covers the original bytes. */
 export const config = { api: { bodyParser: false } };

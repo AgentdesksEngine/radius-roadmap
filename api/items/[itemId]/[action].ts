@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { HttpError, param, readJson, route } from '../../_lib/http';
-import { requireToken } from '../../_lib/session';
-import { GitHubClient } from '../../_lib/github/gql';
-import { moveItem, setItemArchived, setItemFieldAndSync } from '../../_lib/github/board';
-import { cacheItems, invalidateBoard } from '../../_lib/board-cache';
+import { HttpError, param, readJson, route } from '../../_lib/http.js';
+import { requireToken } from '../../_lib/session.js';
+import { GitHubClient } from '../../_lib/github/gql.js';
+import { moveItem, setItemArchived, setItemFieldAndSync } from '../../_lib/github/board.js';
+import { cacheItems, invalidateBoard } from '../../_lib/board-cache.js';
 
 /**
  * /api/items/:itemId/archive, /field and /position in one function — a single dynamic

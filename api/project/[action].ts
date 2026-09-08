@@ -1,8 +1,8 @@
-import { HttpError, noStore, param, route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { readClient } from '../_lib/github/app';
-import { getSchema } from '../_lib/github/board';
-import { readBoard } from '../_lib/board-cache';
+import { HttpError, noStore, param, route } from '../_lib/http.js';
+import { requireToken } from '../_lib/session.js';
+import { readClient } from '../_lib/github/app.js';
+import { getSchema } from '../_lib/github/board.js';
+import { readBoard } from '../_lib/board-cache.js';
 
 /**
  * /api/project/items and /api/project/schema in one function — a single dynamic :action

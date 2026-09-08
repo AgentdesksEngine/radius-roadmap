@@ -1,10 +1,10 @@
 import { randomBytes } from 'node:crypto';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { AuthStatus } from '../../shared/types';
-import { env } from '../_lib/env';
-import { HttpError, noStore, param, route } from '../_lib/http';
-import { getSession } from '../_lib/session';
-import { authorizeUrl, exchangeCode, fetchViewer } from '../_lib/github/oauth';
+import type { AuthStatus } from '../../shared/types.js';
+import { env } from '../_lib/env.js';
+import { HttpError, noStore, param, route } from '../_lib/http.js';
+import { getSession } from '../_lib/session.js';
+import { authorizeUrl, exchangeCode, fetchViewer } from '../_lib/github/oauth.js';
 
 /**
  * All of /api/auth/* in one function — a single dynamic segment (:action) rather than

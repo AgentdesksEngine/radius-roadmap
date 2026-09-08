@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import type { VercelRequest } from '@vercel/node';
-import { HttpError, noStore, readJson, route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { GitHubClient } from '../_lib/github/gql';
-import { addComment, getActivity, getComments, getItem, setIssueState, setSubIssue, syncStatusToState, updateIssue } from '../_lib/github/board';
-import { cacheItems, invalidateBoard } from '../_lib/board-cache';
+import { HttpError, noStore, readJson, route } from '../_lib/http.js';
+import { requireToken } from '../_lib/session.js';
+import { GitHubClient } from '../_lib/github/gql.js';
+import { addComment, getActivity, getComments, getItem, setIssueState, setSubIssue, syncStatusToState, updateIssue } from '../_lib/github/board.js';
+import { cacheItems, invalidateBoard } from '../_lib/board-cache.js';
 
 /**
  * Everything under /api/issues/:id/* in one function — a catch-all rather than three

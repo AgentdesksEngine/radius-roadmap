@@ -1,4 +1,4 @@
-import { HttpError } from '../http';
+import { HttpError } from '../http.js';
 
 const GRAPHQL_URL = 'https://api.github.com/graphql';
 const REST_URL = 'https://api.github.com';

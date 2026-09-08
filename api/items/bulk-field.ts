@@ -1,9 +1,9 @@
 import { z } from 'zod';
-import { HttpError, readJson, route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { GitHubClient } from '../_lib/github/gql';
-import { BULK_LIMIT, setFieldOnItems } from '../_lib/github/board';
-import { cacheItems } from '../_lib/board-cache';
+import { HttpError, readJson, route } from '../_lib/http.js';
+import { requireToken } from '../_lib/session.js';
+import { GitHubClient } from '../_lib/github/gql.js';
+import { BULK_LIMIT, setFieldOnItems } from '../_lib/github/board.js';
+import { cacheItems } from '../_lib/board-cache.js';
 
 const Body = z.object({
   itemIds: z.array(z.string().min(1)).min(1).max(BULK_LIMIT),

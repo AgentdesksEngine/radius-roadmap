@@ -1,9 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getIronSession, type SessionOptions } from 'iron-session';
-import type { SessionUser } from '../../shared/types';
-import { env } from './env';
-import { HttpError } from './http';
-import { refreshAccessToken } from './github/oauth';
+import type { SessionUser } from '../../shared/types.js';
+import { env } from './env.js';
+import { HttpError } from './http.js';
+import { refreshAccessToken } from './github/oauth.js';
 
 export interface SessionToken {
   accessToken: string;

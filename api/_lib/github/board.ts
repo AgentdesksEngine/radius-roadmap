@@ -22,10 +22,10 @@ import type {
   Reaction,
   ReactionContent,
   SubIssueProgress,
-} from '../../../shared/types';
-import { env } from '../env';
-import { HttpError } from '../http';
-import type { GitHubClient } from './gql';
+} from '../../../shared/types.js';
+import { env } from '../env.js';
+import { HttpError } from '../http.js';
+import type { GitHubClient } from './gql.js';
 
 // ---------- GraphQL documents ----------
 

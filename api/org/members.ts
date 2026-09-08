@@ -1,7 +1,7 @@
-import { route } from '../_lib/http';
-import { requireToken } from '../_lib/session';
-import { GitHubClient } from '../_lib/github/gql';
-import { getMembers } from '../_lib/github/board';
+import { route } from '../_lib/http.js';
+import { requireToken } from '../_lib/session.js';
+import { GitHubClient } from '../_lib/github/gql.js';
+import { getMembers } from '../_lib/github/board.js';
 
 export default route({
   GET: async (req, res) => {

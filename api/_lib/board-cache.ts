@@ -18,10 +18,10 @@
  * per-instance too — but it is why the webhook marks the cache stale instead of trying to
  * push the new value into it.
  */
-import type { BoardData, BoardItem } from '../../shared/types';
-import { env } from './env';
-import { getBoard, getBoardSince } from './github/board';
-import type { GitHubClient } from './github/gql';
+import type { BoardData, BoardItem } from '../../shared/types.js';
+import { env } from './env.js';
+import { getBoard, getBoardSince } from './github/board.js';
+import type { GitHubClient } from './github/gql.js';
 
 /**
  * How long a copy is served without checking upstream. Polling is only a fallback for
