@@ -1,8 +1,8 @@
 import { createBrowserClient } from '@supabase/ssr';
 
 /**
- * Browser-side Supabase client. Used for two things only: driving the sign-in UI (Google
- * OAuth + magic link) and the Realtime subscription in src/api/realtime.ts. All actual board
+ * Browser-side Supabase client. Used for two things only: driving the sign-in UI (email +
+ * one-time code) and the Realtime subscription in src/api/realtime.ts. All actual board
  * reads/writes still go through /api/* — this client never talks to Postgres directly.
  *
  * Falls back to a placeholder URL/key when the env vars aren't set, rather than throwing at

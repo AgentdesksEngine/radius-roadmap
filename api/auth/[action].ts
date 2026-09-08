@@ -38,7 +38,7 @@ async function me(req: VercelRequest, res: VercelResponse) {
   noStore(res);
 
   const base = {
-    oauthConfigured: Boolean(e.SUPABASE_URL && e.SUPABASE_ANON_KEY),
+    authConfigured: Boolean(e.SUPABASE_URL && e.SUPABASE_ANON_KEY),
     devLoginAvailable: Boolean(e.DEV_LOGIN_EMAIL && e.DEV_LOGIN_PASSWORD) && !e.isProduction,
   };
 

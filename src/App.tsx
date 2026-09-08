@@ -1,5 +1,5 @@
 import { Navigate, Route, Routes } from 'react-router-dom';
-import { AuthCallback, NotMemberPage, RequireAuth } from './features/auth/AuthPages';
+import { NotMemberPage, RequireAuth } from './features/auth/AuthPages';
 import { AppShell } from './features/shell/AppShell';
 import { UiStateProvider } from './features/shell/state';
 import { AnalyticsView } from './features/analytics/AnalyticsView';
@@ -12,7 +12,6 @@ export function App() {
   return (
     <Routes>
       <Route path="/not-a-member" element={<NotMemberPage />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route
         element={
           <RequireAuth>

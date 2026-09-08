@@ -153,7 +153,8 @@ export type OrgMember = Person;
 
 export interface AuthStatus {
   user: SessionUser | null;
-  oauthConfigured: boolean;
+  /** Whether Supabase is configured at all (SUPABASE_URL/SUPABASE_ANON_KEY set). */
+  authConfigured: boolean;
   devLoginAvailable: boolean;
   /** Set when a real Supabase session existed but the account was not allowed in. */
   deniedEmail?: string;
