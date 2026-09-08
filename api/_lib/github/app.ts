@@ -14,8 +14,8 @@
  * is in until an org owner creates it — callers then use the caller's token as before.
  */
 import { createSign } from 'node:crypto';
-import { env } from '../env';
-import { GitHubClient } from './gql';
+import { env } from '../env.js';
+import { GitHubClient } from './gql.js';
 
 const REST_URL = 'https://api.github.com';
 /** Refresh a little before GitHub expires it, so an in-flight request never fails. */
