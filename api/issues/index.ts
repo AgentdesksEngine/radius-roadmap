@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { createIssue } from '../_lib/db/board';
-import { HttpError, readJson, route } from '../_lib/http';
-import { requireUser } from '../_lib/session';
+import { createIssue } from '../_lib/db/board.js';
+import { HttpError, readJson, route } from '../_lib/http.js';
+import { requireUser } from '../_lib/session.js';
 
 const Body = z.object({
   title: z.string().trim().min(1).max(256),

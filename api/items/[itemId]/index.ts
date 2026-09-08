@@ -1,6 +1,6 @@
-import { getItem } from '../../_lib/db/board';
-import { noStore, param, route } from '../../_lib/http';
-import { requireUser } from '../../_lib/session';
+import { getItem } from '../../_lib/db/board.js';
+import { noStore, param, route } from '../../_lib/http.js';
+import { requireUser } from '../../_lib/session.js';
 
 /**
  * GET /api/items/:itemId — a single refreshed item, used by the Realtime subscription

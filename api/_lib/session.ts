@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import type { SessionUser } from '../../shared/types';
-import { HttpError } from './http';
-import { supabaseAdmin, supabaseForRequest } from './supabase';
+import type { SessionUser } from '../../shared/types.js';
+import { HttpError } from './http.js';
+import { supabaseAdmin, supabaseForRequest } from './supabase.js';
 
 interface ProfileRow {
   id: string;

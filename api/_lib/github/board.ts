@@ -20,10 +20,10 @@ import type {
   ProjectSchema,
   Reaction,
   ReactionContent,
-} from '../../../shared/types';
-import { env } from '../env';
-import { HttpError } from '../http';
-import type { GitHubClient } from './gql';
+} from '../../../shared/types.js';
+import { env } from '../env.js';
+import { HttpError } from '../http.js';
+import type { GitHubClient } from './gql.js';
 
 export interface GitHubPerson {
   login: string;

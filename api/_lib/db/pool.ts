@@ -1,5 +1,5 @@
 import postgres, { type TransactionSql } from 'postgres';
-import { requireSupabaseEnv } from '../env';
+import { requireSupabaseEnv } from '../env.js';
 
 let sql: ReturnType<typeof postgres> | undefined;
 

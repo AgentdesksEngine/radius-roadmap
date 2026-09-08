@@ -32,10 +32,10 @@ import type {
   ProjectSchema,
   Reaction,
   ReactionContent,
-} from '../../../shared/types';
-import { env } from '../env';
-import { HttpError } from '../http';
-import { db, withActor } from './pool';
+} from '../../../shared/types.js';
+import { env } from '../env.js';
+import { HttpError } from '../http.js';
+import { db, withActor } from './pool.js';
 
 // ---------- Schema ----------
 

@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { BULK_LIMIT, setFieldOnItems } from '../_lib/db/board';
-import { HttpError, readJson, route } from '../_lib/http';
-import { requireUser } from '../_lib/session';
+import { BULK_LIMIT, setFieldOnItems } from '../_lib/db/board.js';
+import { HttpError, readJson, route } from '../_lib/http.js';
+import { requireUser } from '../_lib/session.js';
 
 const Body = z.object({
   itemIds: z.array(z.string().min(1)).min(1).max(BULK_LIMIT),

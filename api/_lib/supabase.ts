@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import { env, requireSupabaseEnv } from './env';
+import { env, requireSupabaseEnv } from './env.js';
 
 function parseCookies(header?: string): { name: string; value: string }[] {
   if (!header) return [];
