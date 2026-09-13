@@ -1,21 +1,28 @@
-import { useMemo } from 'react';
-import { useBoard, useSchema } from '@/api/hooks';
+import { useMemo, useState } from 'react';
+import type { Dashboard } from '@shared/types';
+import { useBoard, useDashboards, useSchema } from '@/api/hooks';
 import { Button } from '@/components/ui/Button';
 import { MODULE, STATUS, TEAM, WORK_TYPE, field, filterItems } from '@/model/board';
 import { ageBuckets, cycleTime, openByField, summarize, throughput } from '@/model/analytics';
 import { ViewHeader } from '../shell/ViewHeader';
 import { useUi } from '../shell/state';
 import { BarList, StatTile, ThroughputChart } from './Charts';
+import { AddWidget, DashboardPicker, DEFAULT_DASHBOARD_ID, RemoveWidget } from './Dashboards';
+import { widgetData, widgetTitle } from './widgets';
 import './analytics.css';
 
 /**
  * Everything here is computed in the browser from the board the app already has, so the
- * numbers always match what the other views are showing — no second source of truth.
+ * numbers always match what the other views are showing — no second source of truth. Custom
+ * dashboards are the same measures rearranged: only the *layout* is stored, never a query.
  */
 export function AnalyticsView() {
   const { data: schema } = useSchema();
   const board = useBoard(Boolean(schema));
+  const { data: dashboards } = useDashboards(Boolean(schema));
   const { filters } = useUi();
+  const [currentId, setCurrentId] = useState(DEFAULT_DASHBOARD_ID);
+  const current = dashboards?.find((d) => d.id === currentId);
 
   // Analytics needs the full history, so the state filter is dropped; team and the rest hold.
   const items = useMemo(
@@ -33,7 +40,10 @@ export function AnalyticsView() {
 
   return (
     <>
-      <ViewHeader title="Analytics" count={board.data ? items.length : undefined} />
+      <ViewHeader title="Analytics" count={board.data ? items.length : undefined}>
+        <DashboardPicker dashboards={dashboards ?? []} currentId={currentId} onSelect={setCurrentId} />
+        {current && <AddWidget dashboard={current} schema={schema} />}
+      </ViewHeader>
 
       {board.isError && (
         <div className="error-banner">
@@ -50,6 +60,8 @@ export function AnalyticsView() {
             <div key={i} className="skeleton" style={{ height: 60 }} />
           ))}
         </div>
+      ) : current ? (
+        <CustomDashboard dashboard={current} items={items} schema={schema} />
       ) : (
         <div className="analytics">
           <div className="stat-row">
@@ -117,5 +129,74 @@ export function AnalyticsView() {
         </div>
       )}
     </>
+  );
+}
+
+/**
+ * A saved dashboard. Stat widgets share a row so a set of counters reads as a row of tiles,
+ * the way the built-in page does; charts each get their own cell.
+ */
+function CustomDashboard({
+  dashboard,
+  items,
+  schema,
+}: {
+  dashboard: Dashboard;
+  items: Parameters<typeof widgetData>[1];
+  schema: Parameters<typeof widgetData>[2];
+}) {
+  if (dashboard.widgets.length === 0) {
+    return (
+      <div className="analytics">
+        <div className="dash-empty">
+          <h2>“{dashboard.name}” is empty</h2>
+          <p>Add a widget — a number, a breakdown by any field, throughput, or ageing.</p>
+        </div>
+      </div>
+    );
+  }
+
+  const stats = dashboard.widgets.filter((w) => w.measure === 'stat' || w.measure === 'cycleTime');
+  const charts = dashboard.widgets.filter((w) => w.measure !== 'stat' && w.measure !== 'cycleTime');
+
+  return (
+    <div className="analytics">
+      {stats.length > 0 && (
+        <div className="stat-row">
+          {stats.map((w) => {
+            const data = widgetData(w, items, schema);
+            if (data.kind !== 'stat') return null;
+            return (
+              <div key={w.id} className="widget">
+                <RemoveWidget dashboard={dashboard} widgetId={w.id} />
+                <StatTile label={data.label} value={data.value} sub={data.sub} tone={data.tone} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+      <div className="chart-grid">
+        {charts.map((w) => {
+          const data = widgetData(w, items, schema);
+          return (
+            <div key={w.id} className="widget">
+              <RemoveWidget dashboard={dashboard} widgetId={w.id} />
+              {data.kind === 'throughput' ? (
+                <ThroughputChart data={data.data} />
+              ) : data.kind === 'bars' ? (
+                <BarList
+                  title={data.title}
+                  buckets={data.buckets}
+                  useOptionColors={data.useOptionColors}
+                  empty={data.empty}
+                />
+              ) : (
+                <StatTile label={widgetTitle(w)} value={data.value} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }

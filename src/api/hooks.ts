@@ -7,21 +7,26 @@ import type {
   BoardItem,
   BulkResult,
   CreateIssueRequest,
+  Dashboard,
   FieldWriteValue,
   IssueComment,
   OrgMember,
   ProjectSchema,
   Reaction,
   ReactionContent,
+  SavedView,
   UpdateIssueRequest,
+  Widget,
 } from '@shared/types';
-import { get, patch, post } from './client';
+import { del, get, patch, post } from './client';
 
 export const keys = {
   auth: ['auth'] as const,
   schema: ['schema'] as const,
   board: ['board'] as const,
   members: ['members'] as const,
+  views: ['views'] as const,
+  dashboards: ['dashboards'] as const,
   comments: (issueId: string) => ['comments', issueId] as const,
   activity: (issueId: string) => ['activity', issueId] as const,
 };
@@ -175,7 +180,9 @@ export function useUpdateIssue() {
 export function useCreateIssue() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: CreateIssueRequest) => post<BoardItem>('/api/issues', body),
+    // /api/issues/create, not /api/issues — the catch-all that serves this route only
+    // matches one segment or more (see api/issues/[...path].ts).
+    mutationFn: (body: CreateIssueRequest) => post<BoardItem>('/api/issues/create', body),
     onSuccess: (item) => qc.setQueryData<BoardData>(keys.board, (b) => upsertItem(b, item)),
   });
 }
@@ -304,5 +311,133 @@ export function useBulkField() {
         result.items.reduce<BoardData | undefined>((acc, i) => upsertItem(acc, i), b),
       );
     },
+  });
+}
+
+/**
+ * Watching an issue. Optimistic because the button is the feedback — a toggle that waits on
+ * the network reads as broken.
+ */
+export function useSetWatching() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issueId, watching }: { issueId: string; itemId: string; watching: boolean }) =>
+      post<{ ok: true; watching: boolean; watcherCount: number }>(
+        `/api/issues/${encodeURIComponent(issueId)}/watch`,
+        { watching },
+      ),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: keys.board });
+      const prev = qc.getQueryData<BoardData>(keys.board);
+      qc.setQueryData<BoardData>(keys.board, (b) =>
+        patchItem(b, args.itemId, (i) => ({
+          ...i,
+          viewerWatching: args.watching,
+          watcherCount: Math.max(0, i.watcherCount + (args.watching ? 1 : -1)),
+        })),
+      );
+      return { prev };
+    },
+    onError: (_e, _a, ctx) => {
+      if (ctx?.prev) qc.setQueryData(keys.board, ctx.prev);
+    },
+    onSuccess: (res, args) => {
+      qc.setQueryData<BoardData>(keys.board, (b) =>
+        patchItem(b, args.itemId, (i) => ({ ...i, viewerWatching: res.watching, watcherCount: res.watcherCount })),
+      );
+    },
+  });
+}
+
+export function useSetStarred() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ issueId, starred }: { issueId: string; itemId: string; starred: boolean }) =>
+      post<{ ok: true; starred: boolean }>(`/api/issues/${encodeURIComponent(issueId)}/star`, { starred }),
+    onMutate: async (args) => {
+      await qc.cancelQueries({ queryKey: keys.board });
+      const prev = qc.getQueryData<BoardData>(keys.board);
+      qc.setQueryData<BoardData>(keys.board, (b) =>
+        patchItem(b, args.itemId, (i) => ({ ...i, viewerStarred: args.starred })),
+      );
+      return { prev };
+    },
+    onError: (_e, _a, ctx) => {
+      if (ctx?.prev) qc.setQueryData(keys.board, ctx.prev);
+    },
+  });
+}
+
+// ---------- Saved views (server-backed; see src/model/views.ts for the URL round-trip) ----------
+
+export function useViews(enabled = true) {
+  return useQuery({
+    queryKey: keys.views,
+    queryFn: () => get<SavedView[]>('/api/me/views'),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+export function useCreateView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: Omit<SavedView, 'id' | 'pinned'> & { pinned?: boolean }) =>
+      post<SavedView>('/api/me/views', body),
+    onSuccess: (view) => qc.setQueryData<SavedView[]>(keys.views, (vs) => [...(vs ?? []), view]),
+  });
+}
+
+export function useUpdateView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { id: string; name?: string; pinned?: boolean }) =>
+      patch<SavedView>('/api/me/views', body),
+    onSuccess: (view) =>
+      qc.setQueryData<SavedView[]>(keys.views, (vs) => vs?.map((v) => (v.id === view.id ? view : v))),
+  });
+}
+
+export function useDeleteView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => del<{ ok: true }>('/api/me/views', { id }),
+    onSuccess: (_r, id) => qc.setQueryData<SavedView[]>(keys.views, (vs) => vs?.filter((v) => v.id !== id)),
+  });
+}
+
+// ---------- Dashboards ----------
+
+export function useDashboards(enabled = true) {
+  return useQuery({
+    queryKey: keys.dashboards,
+    queryFn: () => get<Dashboard[]>('/api/me/dashboards'),
+    staleTime: 5 * 60_000,
+    enabled,
+  });
+}
+
+export function useCreateDashboard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; widgets?: Widget[] }) => post<Dashboard>('/api/me/dashboards', body),
+    onSuccess: (d) => qc.setQueryData<Dashboard[]>(keys.dashboards, (ds) => [...(ds ?? []), d]),
+  });
+}
+
+export function useUpdateDashboard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { id: string; name?: string; widgets?: Widget[] }) =>
+      patch<Dashboard>('/api/me/dashboards', body),
+    onSuccess: (d) => qc.setQueryData<Dashboard[]>(keys.dashboards, (ds) => ds?.map((x) => (x.id === d.id ? d : x))),
+  });
+}
+
+export function useDeleteDashboard() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => del<{ ok: true }>('/api/me/dashboards', { id }),
+    onSuccess: (_r, id) => qc.setQueryData<Dashboard[]>(keys.dashboards, (ds) => ds?.filter((d) => d.id !== id)),
   });
 }

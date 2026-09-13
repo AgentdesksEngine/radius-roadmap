@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CheckCircle2, CornerDownRight, ListTree, MessageSquare, XCircle } from 'lucide-react';
+import { CheckCircle2, CornerDownRight, GitPullRequest, ListTree, MessageSquare, XCircle } from 'lucide-react';
 import type { BoardItem, ProjectSchema } from '@shared/types';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Tag } from '@/components/ui/Tag';
@@ -30,6 +30,7 @@ export function CardBody({ item, schema, showTeam }: Pick<Props, 'item' | 'schem
   const teams = selectOptions(item, field(schema, TEAM));
   const workType = selectOption(item, field(schema, WORK_TYPE));
   const topReaction = item.reactions[0];
+  const newestPr = item.pullRequests[item.pullRequests.length - 1];
   return (
     <>
       <div className="card-top">
@@ -56,6 +57,12 @@ export function CardBody({ item, schema, showTeam }: Pick<Props, 'item' | 'schem
               {t.name}
             </Tag>
           ))}
+        {/* Newest PR only: a card is a summary, and the panel lists all of them. */}
+        {newestPr && (
+          <span className={`pr-chip ${newestPr.state}`} title={`${newestPr.repo}#${newestPr.number} ${newestPr.state}`}>
+            <GitPullRequest />#{newestPr.number}
+          </span>
+        )}
         <span className="right">
           {item.subIssues.total > 0 && (
             <span title={`${item.subIssues.completed} of ${item.subIssues.total} sub-issues done`}>

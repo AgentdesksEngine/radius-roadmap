@@ -78,6 +78,10 @@ function item(partial: Partial<BoardItem> & { number: number }): BoardItem {
     subIssues: { total: 0, completed: 0, percent: 0 },
     reactions: [],
     fields: {},
+    pullRequests: [],
+    watcherCount: 0,
+    viewerWatching: false,
+    viewerStarred: false,
     ...partial,
   };
 }

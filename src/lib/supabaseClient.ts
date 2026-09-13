@@ -18,7 +18,15 @@ if (!supabaseConfigured) {
   console.warn('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY are not set — sign-in and Realtime will not work.');
 }
 
+/**
+ * A year, matching SESSION_MAX_AGE_SECONDS in api/_lib/supabase.ts. Without an explicit
+ * maxAge the auth cookie is a session cookie and everyone is signed out when they quit the
+ * browser; with it, the only way out is signing out on purpose.
+ */
+const SESSION_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+
 export const supabase = createBrowserClient(
   import.meta.env.VITE_SUPABASE_URL || 'https://placeholder.supabase.co',
   import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key',
+  { cookieOptions: { maxAge: SESSION_MAX_AGE_SECONDS } },
 );

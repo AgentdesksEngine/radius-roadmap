@@ -17,6 +17,7 @@
 import type { ProjectSchema } from '../../../shared/types.js';
 import { asJson, db, withActor } from '../db/pool.js';
 import { getItem, getSchema } from '../db/board.js';
+import { ensureWatchers } from '../notify.js';
 import type { BoardItem } from '../../../shared/types.js';
 import type { SlackMessage, SlackUser } from './client.js';
 
@@ -371,7 +372,10 @@ export async function ingestSlackMessage(args: {
       do nothing
       returning id
     `;
-    if (rows[0]) return rows[0].id;
+    if (rows[0]) {
+      if (authorId) await ensureWatchers(tx, rows[0].id, [{ profileId: authorId, source: 'author' }]);
+      return rows[0].id;
+    }
     // Lost the race against a concurrent delivery of the same event — take theirs.
     const raced = await tx<{ id: string }[]>`
       select id from issues where slack_channel_id = ${args.channelId} and slack_message_ts = ${args.parent.ts} limit 1

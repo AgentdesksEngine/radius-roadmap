@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { formatDateTime, timeAgo } from '@/model/time';
 import { MarkdownBody } from './Markdown';
+import { MentionInput } from './MentionInput';
 import { Reactions } from './Reactions';
 
 /** Icon and sentence for one non-comment timeline event. */
@@ -162,17 +163,14 @@ export function Activity({ item }: { item: BoardItem }) {
       )}
 
       <div className="composer">
-        <textarea
-          className="textarea"
-          placeholder="Leave a comment… (Markdown supported)"
+        <MentionInput
           value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
-          }}
+          onChange={setDraft}
+          onSubmit={submit}
+          placeholder="Leave a comment… (Markdown supported, @ to mention)"
         />
         <div className="actions">
-          <span className="faint">⌘↵ to post</span>
+          <span className="faint">@ to mention · ⌘↵ to post</span>
           <Button
             variant="primary"
             size="sm"

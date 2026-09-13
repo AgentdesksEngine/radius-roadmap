@@ -30,11 +30,13 @@ import type {
   Person,
   ProjectField,
   ProjectSchema,
+  PullRequestRef,
   Reaction,
   ReactionContent,
 } from '../../../shared/types.js';
 import { env } from '../env.js';
 import { HttpError } from '../http.js';
+import { ensureWatchers, enqueue, notifySoon, parseMentions } from '../notify.js';
 import { asJson, db, withActor } from './pool.js';
 
 // ---------- Schema ----------
@@ -213,6 +215,10 @@ interface RawIssueRow {
   parentState: IssueState | null;
   parentStateReason: IssueStateReason | null;
   parentAssignees: { id: string; name: string | null; avatarUrl: string | null }[] | null;
+  pullRequests: PullRequestRef[];
+  watcherCount: number;
+  viewerWatching: boolean;
+  viewerStarred: boolean;
 }
 
 /**
@@ -237,7 +243,13 @@ async function queryIssues(viewerProfileId: string | null, filter: 'all' | { id:
         (select count(*)::int from comments c where c.issue_id = i.id) as "commentCount",
         coalesce(lbl.agg, '[]'::json) as labels,
         coalesce(asg.agg, '[]'::json) as assignees,
-        coalesce(rxn.agg, '[]'::json) as reactions
+        coalesce(rxn.agg, '[]'::json) as reactions,
+        coalesce(prs.agg, '[]'::json) as "pullRequests",
+        coalesce(wch.cnt, 0) as "watcherCount",
+        coalesce(wch.viewer, false) as "viewerWatching",
+        exists (
+          select 1 from starred_issues st where st.issue_id = i.id and st.profile_id = ${vpid}
+        ) as "viewerStarred"
       from issues i
       left join profiles author on author.id = i.author_id
       left join lateral (
@@ -260,6 +272,19 @@ async function queryIssues(viewerProfileId: string | null, filter: 'all' | { id:
           group by content
         ) r
       ) rxn on true
+      left join lateral (
+        select json_agg(json_build_object(
+          'repo', pr.repo, 'number', pr.number, 'url', pr.url,
+          'title', pr.title, 'state', pr.state, 'draft', pr.draft
+        ) order by pr.number) as agg
+        from issue_pull_requests pr
+        where pr.issue_id = i.id
+      ) prs on true
+      left join lateral (
+        select count(*)::int as cnt, bool_or(w.profile_id = ${vpid}) as viewer
+        from issue_watchers w
+        where w.issue_id = i.id
+      ) wch on true
     )
     select s.*,
       parent.number as "parentNumber", parent.title as "parentTitle",
@@ -329,6 +354,10 @@ function rowToBoardItem(
       viewerHasReacted: r.viewerHasReacted,
     })),
     fields: resolveFields(row.fields, schema, optionById),
+    pullRequests: row.pullRequests,
+    watcherCount: row.watcherCount,
+    viewerWatching: row.viewerWatching,
+    viewerStarred: row.viewerStarred,
   };
 }
 
@@ -351,7 +380,7 @@ export async function getItem(itemId: string, viewerProfileId: string | null): P
 // ---------- Writes: fields ----------
 
 export async function setItemField(
-  profileId: string,
+  profileId: string | null,
   args: { itemId: string; fieldId: string; value: FieldWriteValue },
 ): Promise<void> {
   await withActor(profileId, async (tx) => {
@@ -362,6 +391,21 @@ export async function setItemField(
       await tx`update issues set fields = jsonb_set(fields, array[${args.fieldId}], ${tx.json(asJson(json))}::jsonb) where id = ${args.itemId}`;
     }
   });
+  await notifyStatusChange(profileId, args);
+}
+
+/** Status is the only field worth a DM — it is the board column, so it is the one people track. */
+async function notifyStatusChange(
+  profileId: string | null,
+  args: { itemId: string; fieldId: string; value: FieldWriteValue },
+): Promise<void> {
+  const schema = await getSchema();
+  const status = schema.fields.find((f) => f.name.toLowerCase() === 'status');
+  if (!status || status.id !== args.fieldId) return;
+  const optionId = args.value && 'singleSelectOptionId' in args.value ? args.value.singleSelectOptionId : null;
+  const name = status.options?.find((o) => o.id === optionId)?.name;
+  await enqueue({ issueId: args.itemId, actorId: profileId, kind: 'status', ...(name ? { detail: name } : {}) });
+  notifySoon();
 }
 
 /**
@@ -371,7 +415,7 @@ export async function setItemField(
  * same UPDATE that `setItemField` above issues.
  */
 export async function setItemFieldAndSync(
-  profileId: string,
+  profileId: string | null,
   args: { itemId: string; fieldId: string; value: FieldWriteValue },
 ): Promise<BoardItem> {
   await setItemField(profileId, args);
@@ -448,6 +492,10 @@ export async function createIssue(profileId: string, req: CreateIssueRequest): P
     for (const assigneeId of assigneeIds) {
       await tx`insert into issue_assignees (issue_id, profile_id) values (${issue!.id}, ${assigneeId})`;
     }
+    await ensureWatchers(tx, issue!.id, [
+      { profileId, source: 'author' },
+      ...assigneeIds.map((id) => ({ profileId: id, source: 'assignee' as const })),
+    ]);
     return issue!.id;
   });
 
@@ -459,6 +507,7 @@ export async function updateIssue(
   issueId: string,
   patch: { title?: string; body?: string; assigneeIds?: string[] },
 ): Promise<void> {
+  let assignedNames: string[] | undefined;
   await withActor(profileId, async (tx) => {
     if (patch.title !== undefined || patch.body !== undefined) {
       await tx`
@@ -483,8 +532,24 @@ export async function updateIssue(
       for (const id of validIds) {
         await tx`insert into issue_assignees (issue_id, profile_id) values (${issueId}, ${id}) on conflict do nothing`;
       }
+      await ensureWatchers(
+        tx,
+        issueId,
+        validIds.map((id) => ({ profileId: id, source: 'assignee' as const })),
+      );
+      assignedNames = validIds.map((id) => members.find((m) => m.id === id)?.name ?? 'someone');
     }
   });
+
+  if (assignedNames) {
+    await enqueue({
+      issueId,
+      actorId: profileId,
+      kind: 'assigned',
+      detail: assignedNames.length ? assignedNames.join(', ') : 'nobody',
+    });
+    notifySoon();
+  }
 }
 
 export async function setIssueState(
@@ -501,6 +566,27 @@ export async function setIssueState(
       await tx`update issues set state = 'OPEN', state_reason = null, closed_at = null where id = ${issueId}`;
     }
   });
+  await enqueue({
+    issueId,
+    actorId: profileId,
+    kind: 'closed',
+    detail: state === 'CLOSED' ? (reason === 'NOT_PLANNED' ? 'closed it as not planned' : 'closed it') : 'reopened it',
+  });
+  notifySoon();
+}
+
+// ---------- Watching, starring ----------
+
+export async function setStarred(profileId: string, issueId: string, starred: boolean): Promise<void> {
+  const sql = db();
+  if (starred) {
+    await sql`
+      insert into starred_issues (profile_id, issue_id) values (${profileId}, ${issueId})
+      on conflict do nothing
+    `;
+  } else {
+    await sql`delete from starred_issues where profile_id = ${profileId} and issue_id = ${issueId}`;
+  }
 }
 
 // ---------- Comments ----------
@@ -551,7 +637,8 @@ export async function getComments(issueId: string): Promise<IssueComment[]> {
 }
 
 export async function addComment(profileId: string, issueId: string, body: string): Promise<IssueComment> {
-  return withActor(profileId, async (tx) => {
+  const mentions = parseMentions(body);
+  const comment = await withActor(profileId, async (tx) => {
     const [row] = await tx<{ id: string; body: string; createdAt: string }[]>`
       insert into comments (issue_id, author_id, body)
       values (${issueId}, ${profileId}, ${body})
@@ -560,6 +647,10 @@ export async function addComment(profileId: string, issueId: string, body: strin
     const [author] = await tx<{ id: string; name: string | null; avatarUrl: string | null }[]>`
       select id, display_name as name, avatar_url as "avatarUrl" from profiles where id = ${profileId}
     `;
+    await ensureWatchers(tx, issueId, [
+      { profileId, source: 'comment' },
+      ...mentions.map((id) => ({ profileId: id, source: 'mention' as const })),
+    ]);
     return {
       id: row!.id,
       body: row!.body,
@@ -568,6 +659,10 @@ export async function addComment(profileId: string, issueId: string, body: strin
       reactions: [],
     };
   });
+
+  await enqueue({ issueId, actorId: profileId, kind: 'comment', mentions });
+  notifySoon();
+  return comment;
 }
 
 // ---------- Archive, ordering ----------

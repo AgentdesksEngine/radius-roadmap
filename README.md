@@ -6,24 +6,30 @@ card is a row in `issues`, every column a `field_defs`/`field_options` pair. The
 ran on GitHub Projects v2 — see `docs/` history / git log for that era, and
 `scripts/migrate-github-to-supabase.ts` for the one-off migration between the two.
 
-- App: https://bugtracker.radiusagents.com (internal, Google/@radiusagent.com sign-in)
+- App: https://radius-roadmap.vercel.app (internal, @radiusagent.com sign-in)
+  (`bugtracker.radiusagents.com` is referenced in older notes but does not resolve — the
+  custom domain was never set up.)
 
 ## Views
 
 | View            | What it is for                                                                                                                                                              |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Home**        | The landing page: assigned to you, what you're watching, what you starred, your pinned views, and the triage count.                                                          |
 | **Intake**      | Triage queue: every open issue still missing a Team, Priority or Work type. Accept moves it to Todo, Decline cancels it, Archive hides it.                                  |
 | **Board**       | Kanban, grouped by any single-select field or by assignee. Drag between columns to set the field; in **Manual** order, drag inside a column to set the item's own position. |
 | **List**        | Sortable table. Click to open, ⌘-click to select, shift-click to select a range.                                                                                            |
 | **Spreadsheet** | Every field of every issue in one editable grid, windowed so a thousand rows stay fast.                                                                                     |
-| **Analytics**   | Opened vs closed by week, open counts by status/team/work type/module, backlog age, and time-to-close — all computed in the browser from the same board data.               |
+| **Analytics**   | Opened vs closed by week, open counts by status/team/work type/module, backlog age, and time-to-close — all computed in the browser from the same board data. Build your own dashboards from the same measures. |
 
 Cross-cutting:
 
 - **Selection & bulk edits** — ⌘-click cards or rows, then set Status / Team / Priority / Work type on the
   whole selection in one request. Partial failures are reported, not rolled back.
 - **Saved views** — the filter, grouping and layout live in the URL, so any view is a shareable link.
-  Saving one pins it to the sidebar (stored per browser).
+  Saving one puts it in the sidebar; pinning one puts it on Home. Views are stored per profile in
+  Postgres, so they follow you to another browser. (Anything you had saved before the move is
+  migrated out of localStorage once, on your next sign-in.)
+- **Watching & @mentions** — see "Notifications" below.
 - **Archived** — hides an item from every view without deleting the issue. The sidebar's
   Archived toggle is the only place they show up.
 - **Sub-issues** — parent/child links (`issues.parent_issue_id`), with progress on the card and
@@ -42,10 +48,15 @@ Browser (Vite + React SPA)  →  /api/* (Vercel functions)  →  Supabase Postgr
                                  │ browser also holds a Realtime subscription for live updates
 ```
 
-- **Auth**: Supabase Auth — Google OAuth (primary) or email magic link, both restricted to
-  `@radiusagent.com` (`profiles.allowed`, checked server-side on every request via the
-  service-role client, not just at sign-in). `api/_lib/session.ts`'s `requireUser()` is the one
-  place every protected route calls.
+- **Auth**: Supabase Auth — **Continue with Google** is the primary path, with a six-digit
+  **email code** as the fallback for anyone whose Google account isn't the work one. Both are
+  restricted to `@radiusagent.com` by `profiles.allowed`, set by the `handle_new_user` trigger
+  from the email domain and checked server-side on every request via the service-role client,
+  not just at sign-in. Google's `hd` parameter is only a hint to Google's account chooser — it
+  is removable from the URL and is not the gate. `api/_lib/session.ts`'s `requireUser()` is the
+  one place every protected route calls. Sessions last **a year** unless you sign out
+  deliberately (`SESSION_MAX_AGE_SECONDS`, set on both the server and browser Supabase clients —
+  without it the auth cookie dies when the browser closes).
 - **Reads/writes**: every route under `api/` talks to Postgres directly via a pooled connection
   (`api/_lib/db/pool.ts`, `postgres.js` over Supabase's transaction-mode pooler). There is no
   server-side board cache — a full read of the board is a single cheap SQL query against your
@@ -98,12 +109,15 @@ that true, which also means Slack's retries are harmless.
 
 1. Create an app at [api.slack.com/apps](https://api.slack.com/apps) → _From scratch_, in the
    Radius workspace.
-2. **OAuth & Permissions** → bot token scopes: `app_mentions:read`, `channels:history`,
-   `groups:history` (`#product-critical-bugs` is private, so this one is required),
-   `reactions:read`, `reactions:write`, `chat:write`, `users:read`, `users:read.email`
-   (that last one is how a Slack reporter is matched to a `profiles` row). Install to the
-   workspace and copy the `xoxb-` token.
-3. **Event Subscriptions** → Request URL `https://bugtracker.radiusagents.com/api/slack/events`
+2. **OAuth & Permissions** → bot token scopes: `commands` (required by the message shortcut —
+   Slack rejects the manifest without it, even though the app defines no slash command),
+   `app_mentions:read`, `channels:history`, `groups:history` (`#product-critical-bugs` is
+   private, so this one is required), `reactions:read`, `reactions:write`, `chat:write`,
+   `im:write` (opens the DM channel for notifications — **added after the first release, so the
+   app must be reinstalled** to pick it up), `users:read`, `users:read.email` (that last one is
+   how a Slack account is matched to a `profiles` row, for both reporters and DM recipients).
+   Install to the workspace and copy the `xoxb-` token.
+3. **Event Subscriptions** → Request URL `https://radius-roadmap.vercel.app/api/slack/events`
    (it answers the `url_verification` handshake), then subscribe to bot events `app_mention`
    and `reaction_added`.
 4. **Interactivity & Shortcuts** → Request URL `.../api/slack/interactivity`; add a shortcut of
@@ -113,8 +127,9 @@ that true, which also means Slack's retries are harmless.
 6. **Invite the app to the channel** — `/invite @bugtracker` in `#product-critical-bugs`. A
    private channel is invisible to the app until you do, and nothing will fail loudly.
 
-Apply the migration before the first event arrives:
-`supabase/migrations/0003_slack_ingest.sql`, plus the new `Source: Slack` option from
+Apply the migrations before the first event arrives:
+`supabase/migrations/0003_slack_ingest.sql` and `0004_notifications_home_github.sql`, plus the
+`Source: Slack` option from
 `fields.config.ts` (`seedFieldSchema()` in `scripts/_field-schema.ts` is idempotent, but it is
 only wired into the one-off migration scripts — add the option with SQL, or run one).
 
@@ -124,6 +139,63 @@ Two things are load-bearing and easy to break:
   `readRawBody()`. Re-serialising `req.body` produces a different string and every request 401s.
 - Slack wants a 200 within **3 seconds** or it retries. The route acks first and finishes the
   work in `waitUntil`, so the Slack API calls aren't repeated three times over.
+
+## Notifications
+
+Watching an issue means **a Slack DM to you**, not a message in a channel. `api/_lib/notify.ts`
+is the whole stack.
+
+- **Who gets told**: everyone watching the issue, plus anyone `@mentioned` in the text that
+  caused the event, minus whoever caused it. You are never notified about your own click.
+- **Auto-watch**: you start watching an issue you report, are assigned to, comment on, or are
+  `@mentioned` in. **Watch / Watching** in the issue panel adds or removes you by hand; removing
+  yourself is a real delete, so commenting again re-subscribes you.
+- **Batching**: at most one DM per (issue, recipient) per **two minutes**. Events that land
+  inside the window join the open batch and arrive as one message — "3 updates on RAD-42" — with
+  a deep link to the issue. The partial unique index on `notification_outbox` is that rule.
+- **@mentions**: typing `@` in a comment opens a member picker. The stored markdown is
+  `[@Jane Doe](mention:<profile id>)` — the id, not the name, so a rename cannot break the link
+  — rendered as a chip, never as a raw link.
+- **Silent failure is deliberate**: if nobody in Slack has that email, or the token is missing
+  the scope, the notification is logged and dropped. It never fails the comment or the field
+  write that produced it, and it never shows an error to the person writing.
+
+One platform quirk worth knowing: a Vercel function can't be relied on to stay alive for the
+full two-minute window, so the batch is drained two ways — a background worker that sleeps out
+the window, **and** an opportunistic sweep on every board load (`/api/project/items`). Whichever
+gets there first wins; the claim is a single atomic `UPDATE ... RETURNING`, so a batch cannot be
+sent twice.
+
+## GitHub pull requests
+
+The board is not on GitHub and this does not put it back. A PR that names a `RAD-…` key in its
+**branch, title or body** attaches itself to that issue and can nudge its status forward.
+
+| PR event                             | Status becomes       | But only if it is currently |
+| ------------------------------------ | -------------------- | --------------------------- |
+| opened / ready for review / reopened  | **In review**        | Todo, In progress           |
+| merged                               | **Ready to release** | In review, In QA            |
+| closed without merging               | _unchanged_          | — (the PR is marked closed) |
+
+A draft PR changes nothing until it is marked ready. Anything further along — Done, Canceled,
+Can't reproduce, or already past the target — is left alone: a webhook must never overwrite a
+human's decision. A PR naming several keys attaches to all of them and applies the rule to each
+independently. Watchers get a DM (batched like everything else); PR chips show on the card and
+in the panel.
+
+### Setting it up
+
+1. A GitHub App (or a plain org webhook) on the `AgentdesksEngine` org, with **Pull requests:
+   Read-only** and **Metadata: Read-only**. No API token is needed — everything used comes in
+   the webhook payload, so `GITHUB_APP_ID` / `GITHUB_APP_PRIVATE_KEY` stay migration-only.
+2. Webhook URL `https://radius-roadmap.vercel.app/api/github/webhook`, content type
+   **application/json**, with a secret.
+3. Subscribe to the **Pull request** event only.
+4. Set `GITHUB_WEBHOOK_SECRET` (the same secret) and `GITHUB_ORG` in Vercel.
+
+Same two load-bearing details as Slack: `X-Hub-Signature-256` is an HMAC over the **raw** bytes
+(`bodyParser: false` + `readRawBody()`), and the route acks before doing the work. Events from a
+repo outside `GITHUB_ORG` are ignored even if the signature is valid.
 
 ## Local development
 
@@ -135,10 +207,17 @@ pnpm dev                     # web on :5173, api on :3001 (proxied under /api)
 
 You'll need a Supabase project (free tier is enough — see `SUPABASE_URL` /
 `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `DATABASE_URL` in Project Settings → API /
-Database) with `supabase/migrations/0001_init.sql` applied, and either:
+Database) with **every** migration in `supabase/migrations/` applied in order, and one of:
 
-- Google OAuth enabled in Supabase Auth (Authentication → Providers), with a Google Cloud OAuth
-  client whose redirect URI is `<your Supabase project>.supabase.co/auth/v1/callback`, or
+- **Google** enabled in Supabase Auth (Authentication → Providers) with a Google Cloud OAuth
+  client. Three redirect URIs have to exist for it to work everywhere: the Google Cloud client
+  needs `https://<your project>.supabase.co/auth/v1/callback`, and Supabase's own redirect
+  allowlist (Authentication → URL Configuration) needs
+  `https://radius-roadmap.vercel.app/auth/callback` **and** `http://localhost:5173/auth/callback`.
+- **Email code** — the Email provider, with `{{ .Token }}` added to *both* the "Magic Link" and
+  "Confirm signup" templates (Supabase uses the second one for a person's first-ever sign-in).
+  Note Supabase's built-in sender is rate-limited to a handful of mails an hour across the whole
+  project; real rollout needs custom SMTP.
 - `DEV_LOGIN_EMAIL` / `DEV_LOGIN_PASSWORD` set to one Supabase account with the email/password
   provider enabled, for local sign-in without email delivery — click "Developer sign-in".
 
@@ -154,8 +233,25 @@ Scripts:
 ## Deploy
 
 Vercel, framework preset _Vite_. `vercel.json` rewrites non-API routes to the SPA.
-Required env in Vercel: everything in `.env.example` except the `DEV_*` and `GITHUB_*` entries
-(those are migration/local-dev only — see `.env.example`'s comments).
-Custom domain: add `bugtracker.radiusagents.com` in Vercel and create the CNAME it shows; also
-register that domain's `/auth/callback` path in both the Google Cloud OAuth client's redirect
-URIs and Supabase Auth's redirect allowlist.
+Required env in Vercel: everything in `.env.example` except the `DEV_*` entries and the block
+marked migration-only (see `.env.example`'s comments). `APP_URL` must be the real public origin —
+every issue deep link, including the ones in Slack DMs, is built from it.
+
+**The Hobby plan caps a deployment at 12 serverless functions**, and each file under `api/` is
+one. There are 11. Exceeding the cap does not fail the build: it fails *after* it, as a generic
+"Build Failed" whose real cause (`exceeded_serverless_functions_per_deployment`) is only visible
+via `npx vercel inspect <url>`. Add routes as another branch of an existing `[action]` /
+catch-all dispatcher rather than a new file.
+
+**Relative imports under `api/` and `shared/` need an explicit `.js` extension** in the
+TypeScript source. `@vercel/node` transpiles each function in place instead of bundling it, so
+Node's real ESM loader resolves the specifier verbatim and an extensionless one 500s at runtime.
+Nothing local catches it — not `pnpm typecheck`, not `pnpm build`. To check:
+
+```bash
+grep -rEn "from ['\"]\.[^'\"]*['\"]" api shared | grep -v '.test.ts' | grep -vE "\.(js|json)['\"]"
+```
+
+Custom domain: add `bugtracker.radiusagents.com` in Vercel and create the CNAME it shows (it does
+not resolve today). If you do, add that origin's `/auth/callback` to Supabase Auth's redirect
+allowlist, point `APP_URL` at it, and update the Slack and GitHub webhook URLs.

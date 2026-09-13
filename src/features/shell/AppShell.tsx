@@ -1,13 +1,15 @@
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useBoard, useSchema } from '@/api/hooks';
 import { useBoardRealtime } from '@/api/realtime';
 import { Button } from '@/components/ui/Button';
 import { Sidebar } from './Sidebar';
+import { ShortcutsDialog } from './Shortcuts';
 import { useUi } from './state';
 import { IssuePanel } from '../issue/IssuePanel';
 import { NewIssueDialog } from '../new-issue/NewIssueDialog';
 import { CommandPalette } from '../palette/CommandPalette';
+import { Tour } from '../tour/Tour';
 import './shell.css';
 
 function isTyping(e: KeyboardEvent) {
@@ -17,6 +19,7 @@ function isTyping(e: KeyboardEvent) {
 
 export function AppShell() {
   const schema = useSchema();
+  const navigate = useNavigate();
   useBoard(Boolean(schema.data));
   useBoardRealtime(Boolean(schema.data));
   const {
@@ -24,10 +27,15 @@ export function AppShell() {
     openIssue,
     setNewIssueOpen,
     setPaletteOpen,
+    setShortcutsOpen,
     newIssueOpen,
     paletteOpen,
+    shortcutsOpen,
+    sidebarOpen,
+    setSidebarOpen,
     selection,
     setSelection,
+    tourOpen,
   } = useUi();
 
   useEffect(() => {
@@ -37,11 +45,35 @@ export function AppShell() {
         setPaletteOpen(!paletteOpen);
         return;
       }
-      if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
-      if (e.key === 'Escape' && !newIssueOpen && !paletteOpen) {
-        // A selection is the shallowest thing on screen, so it clears first.
-        if (selection.length) setSelection([]);
+
+      // Escape is handled before the typing guard, so it works from inside a field too.
+      // The ladder: a field that fully handled it has already called preventDefault; else
+      // leave the field, then drop the selection, then close whatever is open.
+      if (e.key === 'Escape') {
+        if (isTyping(e)) {
+          if (!e.defaultPrevented) (e.target as HTMLElement).blur();
+          return;
+        }
+        if (newIssueOpen || paletteOpen || shortcutsOpen) return; // Radix closes these itself
+        if (sidebarOpen) setSidebarOpen(false);
+        else if (selection.length) setSelection([]);
         else if (openKey) openIssue(null);
+        return;
+      }
+
+      if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (tourOpen) return; // the tour owns the arrow keys while it is up
+
+      if (e.key === '?') {
+        e.preventDefault();
+        setShortcutsOpen(true);
+        return;
+      }
+      if (e.key === 'h') {
+        e.preventDefault();
+        navigate('/home');
+        return;
       }
       if (e.key === 'c' && !newIssueOpen) {
         e.preventDefault();
@@ -59,14 +91,27 @@ export function AppShell() {
     openIssue,
     setNewIssueOpen,
     setPaletteOpen,
+    setShortcutsOpen,
     newIssueOpen,
     paletteOpen,
+    shortcutsOpen,
+    sidebarOpen,
+    setSidebarOpen,
     selection,
     setSelection,
+    tourOpen,
+    navigate,
   ]);
 
   return (
     <div className="shell">
+      {sidebarOpen && (
+        <div
+          className="sidebar-scrim"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
       <Sidebar />
       <main className="main">
         {schema.isError ? (
@@ -83,6 +128,8 @@ export function AppShell() {
       <IssuePanel />
       <NewIssueDialog />
       <CommandPalette />
+      <ShortcutsDialog />
+      <Tour />
     </div>
   );
 }
