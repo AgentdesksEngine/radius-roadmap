@@ -175,11 +175,13 @@ export function parseHints(hintText: string, schema: ProjectSchema): DraftFields
     if (platform && optionExists(schema, 'Platform', platform) && !platforms.includes(platform))
       platforms.push(platform);
 
-    if (!out.select.Team && optionExists(schema, 'Team', w)) {
+    if (optionExists(schema, 'Team', w)) {
       const team = schema.fields
         .find((f) => f.name === 'Team')
         ?.options?.find((o) => o.name.toLowerCase() === w);
-      if (team) out.select.Team = team.name;
+      // An issue can span platforms, so it can belong to several teams.
+      if (team && !(out.multiSelect.Team ?? []).includes(team.name))
+        out.multiSelect.Team = [...(out.multiSelect.Team ?? []), team.name];
     }
   }
 

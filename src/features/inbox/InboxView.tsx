@@ -13,7 +13,7 @@ import {
   field,
   intakeItems,
   missingTriageFields,
-  selectName,
+  selectNames,
 } from '@/model/board';
 import { LOGROCKET_FIELD, parseSessionUrl } from '@/model/logrocket';
 import { timeAgo } from '@/model/time';
@@ -133,7 +133,7 @@ export function InboxView() {
                   })()}
                   {CONTEXT_FIELDS.map((name) => {
                     const v = item.fields[name];
-                    const text = v?.kind === 'text' ? v.text : selectName(item, name);
+                    const text = v?.kind === 'text' ? v.text : selectNames(item, name).join(', ');
                     return text ? (
                       <span key={name} className="tag" title={name}>
                         <span className="faint">{name}</span> {text}

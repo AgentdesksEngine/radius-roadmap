@@ -1,5 +1,5 @@
 import type { BoardItem } from '@shared/types';
-import { PLATFORM, TEAM, selectName } from './board';
+import { PLATFORM, TEAM, selectNames } from './board';
 
 /**
  * LogRocket session replays, attached to bugs.
@@ -52,7 +52,7 @@ function platformNames(item: BoardItem): string[] {
  * idea which app it is still needs somewhere to look.
  */
 export function projectsFor(item: BoardItem): LogRocketProject[] {
-  const surfaces = [...platformNames(item), selectName(item, TEAM)].filter((s): s is string =>
+  const surfaces = [...platformNames(item), ...selectNames(item, TEAM)].filter((s): s is string =>
     Boolean(s),
   );
   const ids = new Set(surfaces.flatMap((s) => BY_SURFACE[s.toLowerCase()] ?? []));

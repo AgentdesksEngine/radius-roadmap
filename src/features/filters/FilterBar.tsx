@@ -13,7 +13,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/Menu';
 import { Picker, type PickerItem } from '@/components/ui/Picker';
-import { TEAM, activeFilterCount, selectFields, type StateFilter } from '@/model/board';
+import { TEAM, activeFilterCount, filterableFields, type StateFilter } from '@/model/board';
 import { useUi } from '../shell/state';
 
 const STATE_LABEL: Record<StateFilter, string> = {
@@ -32,7 +32,7 @@ export function FilterBar() {
   const { data: members } = useMembers(picking === ASSIGNEE || filters.assignees.length > 0);
 
   if (!schema) return null;
-  const fields = selectFields(schema).filter((f) => f.name !== TEAM || filters.team === null);
+  const fields = filterableFields(schema).filter((f) => f.name !== TEAM || filters.team === null);
 
   const fieldItems = (f: ProjectField): PickerItem[] => [
     { id: '__none', label: `No ${f.name.toLowerCase()}` },

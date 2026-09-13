@@ -26,7 +26,7 @@ const schema = {
     {
       id: 'f-team',
       name: 'Team',
-      dataType: 'SINGLE_SELECT',
+      dataType: 'MULTI_SELECT',
       options: [
         { id: 'o-ios', name: 'iOS' },
         { id: 'o-android', name: 'Android' },
@@ -186,10 +186,10 @@ describe('parseHints', () => {
     expect(parseHints('critical', schema).select.Priority).toBe('Urgent');
   });
 
-  it('maps platform hints to the multi-select and a single-platform Team', () => {
+  it('maps platform hints to the multi-select and every matching Team', () => {
     const hints = parseHints('ios android', schema);
     expect(hints.multiSelect.Platform).toEqual(['iOS', 'Android']);
-    expect(hints.select.Team).toBe('iOS');
+    expect(hints.multiSelect.Team).toEqual(['iOS', 'Android']);
   });
 
   it('matches module option names including multi-word ones', () => {
@@ -285,7 +285,7 @@ describe('buildIssueDraft', () => {
   });
 
   it('leaves Team and Severity unset so the issue lands in Intake', () => {
-    expect(draft.fields.select.Team).toBeUndefined();
+    expect(draft.fields.multiSelect.Team).toBeUndefined();
     expect(draft.fields.select.Severity).toBeUndefined();
   });
 });

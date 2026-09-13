@@ -1,10 +1,11 @@
 import { Archive, ArchiveRestore, X } from 'lucide-react';
+import type { ProjectField } from '@shared/types';
 import { useArchiveItem, useBulkField, useSchema } from '@/api/hooks';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Picker } from '@/components/ui/Picker';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
-import { PRIORITY, STATUS, TEAM, WORK_TYPE, field } from '@/model/board';
+import { PRIORITY, STATUS, TEAM, WORK_TYPE, field, selectWrite } from '@/model/board';
 import { PriorityIcon } from '../board/PriorityIcon';
 import { useUi } from '../shell/state';
 import './bulk.css';
@@ -32,9 +33,9 @@ export function BulkBar() {
     setSelection([]);
   };
 
-  const apply = (fieldId: string, optionId: string, label: string) =>
+  const apply = (f: ProjectField, optionId: string, label: string) =>
     bulk.mutate(
-      { itemIds: selection, fieldId, value: { singleSelectOptionId: optionId } },
+      { itemIds: selection, fieldId: f.id, value: selectWrite(f, [optionId]) },
       {
         onSuccess: (r) => report(`Set ${label} on`, r.failed),
         onError: (e) => toast.error(`Bulk update failed: ${e.message}`),
@@ -71,7 +72,7 @@ export function BulkBar() {
               icon: isPrio ? <PriorityIcon name={o.name} /> : undefined,
             }))}
             value={null}
-            onSelect={(id) => apply(f.id, id, f.name.toLowerCase())}
+            onSelect={(id) => apply(f, id, f.name.toLowerCase())}
             placeholder={`Set ${f.name.toLowerCase()}…`}
           >
             <Button

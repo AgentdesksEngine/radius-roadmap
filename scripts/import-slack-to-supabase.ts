@@ -103,7 +103,7 @@ interface Mapped {
   severity?: string;
   module?: string;
   source?: string;
-  team?: string;
+  teams: string[];
   platforms: string[];
   eta?: string;
   releaseDate?: string;
@@ -183,7 +183,8 @@ function mapRow(r: Row): Mapped | null {
     .split(',')
     .map((p) => p.trim())
     .filter((p) => ['iOS', 'Android', 'Web'].includes(p));
-  const team = platforms.length === 1 ? platforms[0] : undefined;
+  // One row can name several platforms, and each platform is a team that owns it.
+  const teams = [...platforms];
 
   const submitted = mapEmails(col(r, 'Submitted by'));
   const assignees = mapEmails(col(r, 'Assignee'));
@@ -220,7 +221,7 @@ function mapRow(r: Row): Mapped | null {
     severity,
     module,
     source,
-    team,
+    teams,
     platforms,
     eta: isoDate(col(r, 'ETA')),
     releaseDate: isoDate(col(r, 'Release date')),
@@ -245,20 +246,22 @@ function fieldsJsonFor(m: Mapped, maps: FieldMaps): Record<string, unknown> {
     if (fieldId && optionId) out[fieldId] = { optionId };
   };
   single('Status', m.status);
-  single('Team', m.team);
   single('Work type', m.type);
   single('Priority', m.priority);
   single('Severity', m.severity);
   single('Module', m.module);
   single('Source', m.source);
 
-  const platformFieldId = maps.fieldIdByName.get('Platform');
-  if (platformFieldId && m.platforms.length) {
-    const optionIds = m.platforms
-      .map((p) => maps.optionIdByKey.get(`platform|${p.toLowerCase()}`))
+  const multi = (fieldName: string, optionNames: string[]) => {
+    const fieldId = maps.fieldIdByName.get(fieldName);
+    if (!fieldId || !optionNames.length) return;
+    const optionIds = optionNames
+      .map((n) => maps.optionIdByKey.get(`${fieldName.toLowerCase()}|${n.toLowerCase()}`))
       .filter((x): x is string => Boolean(x));
-    if (optionIds.length) out[platformFieldId] = { optionIds };
-  }
+    if (optionIds.length) out[fieldId] = { optionIds };
+  };
+  multi('Platform', m.platforms);
+  multi('Team', m.teams);
 
   const date = (fieldName: string, v: string | undefined) => {
     const fieldId = maps.fieldIdByName.get(fieldName);
@@ -360,7 +363,7 @@ async function main() {
       }
       return [...c.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k}: ${n}`).join(', ');
     };
-    for (const k of ['status', 'type', 'priority', 'severity', 'module', 'source', 'team', 'platforms', 'close'] as const) {
+    for (const k of ['status', 'type', 'priority', 'severity', 'module', 'source', 'teams', 'platforms', 'close'] as const) {
       console.log(`${k.padEnd(10)} ${count(k)}`);
     }
     console.log(`authorEmail found for ${todo.filter((m) => m.authorEmail).length}/${todo.length} rows`);
@@ -368,7 +371,7 @@ async function main() {
     console.log(`\nFirst ${Math.min(5, todo.length)} rows:\n`);
     for (const m of todo.slice(0, 5)) {
       console.log(`— ${m.title}`);
-      console.log(`  status=${m.status} type=${m.type} priority=${m.priority} severity=${m.severity} module=${m.module} team=${m.team} platforms=${m.platforms.join('+')} close=${m.close}`);
+      console.log(`  status=${m.status} type=${m.type} priority=${m.priority} severity=${m.severity} module=${m.module} teams=${m.teams.join('+')} platforms=${m.platforms.join('+')} close=${m.close}`);
       console.log(`  author=${m.authorEmail} assignees=${m.assigneeEmails.join(', ')} submittedAt=${m.submittedAt}`);
     }
   }
