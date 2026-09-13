@@ -103,6 +103,21 @@ export interface SubIssueProgress {
   percent: number;
 }
 
+/**
+ * A GitHub pull request linked to an issue by a RAD-key in its branch, title or body.
+ * 'merged' is our own state: GitHub reports a merge as closed + merged, and the two mean
+ * opposite things for auto-status.
+ */
+export interface PullRequestRef {
+  /** owner/name */
+  repo: string;
+  number: number;
+  url: string;
+  title: string;
+  state: 'open' | 'merged' | 'closed';
+  draft: boolean;
+}
+
 export interface BoardItem {
   /** Project item node id (PVTI_...). Used for field mutations. */
   itemId: string;
@@ -131,6 +146,11 @@ export interface BoardItem {
   reactions: Reaction[];
   /** Custom field values keyed by field *name*. Unset fields are absent. */
   fields: Record<string, FieldValue>;
+  pullRequests: PullRequestRef[];
+  watcherCount: number;
+  /** Viewer-scoped, like `Reaction.viewerHasReacted` — the board is fetched per signed-in user. */
+  viewerWatching: boolean;
+  viewerStarred: boolean;
 }
 
 export interface BoardData {
@@ -246,4 +266,42 @@ export interface BulkResult {
 export interface ApiError {
   error: string;
   details?: unknown;
+}
+
+// ---------- Home, saved views, dashboards ----------
+
+export interface SavedView {
+  id: string;
+  name: string;
+  /** Route the view opens in: '/board', '/list', '/sheet'. */
+  path: string;
+  /** Opaque on the wire — the same JSON encodeFilters()/decodeFilters() put in the URL. */
+  filters: unknown;
+  groupBy: string;
+  /** Pinned views get their own section on /home. */
+  pinned: boolean;
+}
+
+/**
+ * A dashboard widget names a measure from src/model/analytics.ts, nothing more. There is no
+ * stored query: every widget runs over the board the client already has.
+ */
+export type WidgetMeasure = 'stat' | 'openByField' | 'throughput' | 'age' | 'cycleTime';
+
+export type WidgetStat = 'open' | 'createdRecently' | 'closedRecently' | 'needsTriage' | 'urgentOpen' | 'net';
+
+export interface Widget {
+  id: string;
+  measure: WidgetMeasure;
+  title?: string;
+  /** Which counter, when measure is 'stat'. */
+  stat?: WidgetStat;
+  /** Field *name* to group by, when measure is 'openByField'. */
+  groupBy?: string;
+}
+
+export interface Dashboard {
+  id: string;
+  name: string;
+  widgets: Widget[];
 }

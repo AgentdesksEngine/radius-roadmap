@@ -1,0 +1,95 @@
+.home {
+  padding: 16px 20px 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  overflow-y: auto;
+  max-width: 900px;
+}
+
+.home-callout {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  color: var(--text);
+  font-size: 12.5px;
+  text-decoration: none;
+}
+.home-callout:hover { border-color: var(--border-strong); }
+.home-callout strong { font-variant-numeric: tabular-nums; }
+.home-callout span { color: var(--text-2); }
+
+.home-section h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--text-2);
+}
+.home-section h2 .count {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-3);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.home-empty {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+
+.home-list,
+.home-views {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.home-list li + li,
+.home-views li + li { border-top: 1px solid var(--border); }
+
+.home-list button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  background: none;
+  border: 0;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font-size: 12.5px;
+}
+.home-list button:hover { background: var(--bg-hover); }
+
+/* The title is the only part allowed to take the slack, so the chips stay put. */
+.home-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.home-views a {
+  display: block;
+  padding: 7px 10px;
+  color: var(--text);
+  text-decoration: none;
+  font-size: 12.5px;
+}
+.home-views a:hover { background: var(--bg-hover); }

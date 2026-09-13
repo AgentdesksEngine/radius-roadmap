@@ -1,63 +1,70 @@
-import { useCallback, useSyncExternalStore } from 'react';
+import { useCallback, useEffect } from 'react';
+import type { SavedView as StoredView } from '@shared/types';
+import { useCreateView, useDeleteView, useUpdateView, useViews } from '../api/hooks';
 import { DEFAULT_FILTERS, type Filters } from './board';
 
 /**
  * A saved view is a named filter set plus the layout it was saved from.
- * Views live in localStorage (per browser) but every view is also a URL, so sharing one
- * with a teammate is a copy-paste rather than a sync problem.
+ * Views live per profile in Postgres (they used to be localStorage, which meant they vanished
+ * on a second device), but every view is still also a URL, so sharing one with a teammate
+ * stays a copy-paste rather than a sync problem.
  */
-export interface SavedView {
-  id: string;
-  name: string;
-  /** Route the view opens in: '/board', '/list', '/sheet'. */
-  path: string;
+export interface SavedView extends Omit<StoredView, 'filters'> {
   filters: Filters;
-  groupBy: string;
 }
 
-const KEY = 'bt:views';
+const LEGACY_KEY = 'bt:views';
+const MIGRATED_KEY = 'bt:views-migrated';
 
-function read(): SavedView[] {
-  try {
-    const raw = localStorage.getItem(KEY);
-    const parsed = raw ? (JSON.parse(raw) as SavedView[]) : [];
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+function hydrate(view: StoredView): SavedView {
+  return { ...view, filters: decodeFilters(JSON.stringify(view.filters ?? {})) };
 }
 
-let cache: SavedView[] = read();
-const listeners = new Set<() => void>();
-
-function write(views: SavedView[]) {
-  cache = views;
-  try {
-    localStorage.setItem(KEY, JSON.stringify(views));
-  } catch {
-    /* quota or private mode: the views stay in memory for this session */
-  }
-  for (const l of listeners) l();
-}
-
-function subscribe(fn: () => void) {
-  listeners.add(fn);
-  return () => listeners.delete(fn);
+/**
+ * Moves whatever this browser had in localStorage into the account, once. Marked done even
+ * when there was nothing to move, so it never runs twice, and deliberately silent: a failed
+ * migration is not worth a toast on someone's first load.
+ */
+function useLegacyMigration(ready: boolean) {
+  const create = useCreateView();
+  const run = create.mutateAsync;
+  useEffect(() => {
+    if (!ready) return;
+    let legacy: Omit<SavedView, 'id' | 'pinned'>[] = [];
+    try {
+      if (localStorage.getItem(MIGRATED_KEY)) return;
+      legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) ?? '[]');
+      localStorage.setItem(MIGRATED_KEY, '1');
+    } catch {
+      return; // private mode: nothing to migrate, and nothing to remember either
+    }
+    if (!Array.isArray(legacy)) return;
+    for (const v of legacy) {
+      if (!v?.name || !v?.path) continue;
+      void run({ name: v.name, path: v.path, filters: v.filters ?? DEFAULT_FILTERS, groupBy: v.groupBy ?? 'Status' });
+    }
+  }, [ready, run]);
 }
 
 export function useSavedViews() {
-  const views = useSyncExternalStore(subscribe, () => cache);
-  const save = useCallback((view: Omit<SavedView, 'id'>) => {
-    const id = `v${Date.now().toString(36)}`;
-    write([...cache, { ...view, id }]);
-    return id;
-  }, []);
-  const remove = useCallback((id: string) => write(cache.filter((v) => v.id !== id)), []);
-  const rename = useCallback(
-    (id: string, name: string) => write(cache.map((v) => (v.id === id ? { ...v, name } : v))),
-    [],
+  const query = useViews();
+  const create = useCreateView();
+  const update = useUpdateView();
+  const remove = useDeleteView();
+  useLegacyMigration(query.isSuccess);
+
+  const views = (query.data ?? []).map(hydrate);
+
+  const save = useCallback(
+    (view: Omit<SavedView, 'id' | 'pinned'>) =>
+      create.mutateAsync({ name: view.name, path: view.path, filters: view.filters, groupBy: view.groupBy }),
+    [create],
   );
-  return { views, save, remove, rename };
+  const rename = useCallback((id: string, name: string) => update.mutate({ id, name }), [update]);
+  const setPinned = useCallback((id: string, pinned: boolean) => update.mutate({ id, pinned }), [update]);
+  const destroy = useCallback((id: string) => remove.mutate(id), [remove]);
+
+  return { views, save, remove: destroy, rename, setPinned, isLoading: query.isPending };
 }
 
 // ---------- URL round-trip ----------
@@ -92,7 +99,7 @@ export function decodeFilters(raw: string | null): Filters {
   }
 }
 
-export function viewHref(view: SavedView): string {
+export function viewHref(view: Omit<SavedView, 'id' | 'name' | 'pinned'> & { id?: string; name?: string; pinned?: boolean }): string {
   const f = encodeFilters(view.filters);
   const params = new URLSearchParams();
   if (f) params.set('f', f);

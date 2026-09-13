@@ -17,23 +17,12 @@
  * but a 3s-timeout loop would still triple the Slack API calls for nothing.
  */
 import type { VercelResponse } from '@vercel/node';
+import { afterResponse } from '../_lib/after.js';
 import { requireSlackEnv, slackIngestChannels, env } from '../_lib/env.js';
 import { HttpError, param, readRawBody, route } from '../_lib/http.js';
 import { SlackClient, type SlackMessage, type SlackUser } from '../_lib/slack/client.js';
 import { ingestSlackMessage, parseAddCommand } from '../_lib/slack/ingest.js';
 import { verifySlackSignature } from '../_lib/slack/verify.js';
-
-/** Runs `fn` after the response is sent, keeping the invocation alive on Vercel. */
-async function afterResponse(fn: () => Promise<void>): Promise<void> {
-  const run = fn().catch((err) => console.error('[slack] background work failed:', err));
-  try {
-    const { waitUntil } = await import('@vercel/functions');
-    waitUntil(run);
-  } catch {
-    // Local dev (scripts/dev-api.ts) has no platform to hand the promise to — just await.
-    await run;
-  }
-}
 
 // ---------- shared capture path ----------
 

@@ -1,34 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Archive,
   BarChart3,
   Bookmark,
+  Compass,
   ExternalLink,
+  Home,
   Inbox,
+  Keyboard,
   LayoutGrid,
   List,
   LogOut,
   Monitor,
   Moon,
   MoreHorizontal,
+  Pin,
+  PinOff,
   Plus,
   Sheet,
   Sun,
   Trash2,
   UserCircle,
+  X,
 } from 'lucide-react';
 import { useAuth, useBoard, useSchema } from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Logo } from '@/components/ui/Logo';
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu';
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  MenuTrigger,
+} from '@/components/ui/Menu';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
 import { TEAM, field, intakeItems, teamCounts } from '@/model/board';
-import { useTheme } from '@/model/prefs';
+import { useTheme, type Theme } from '@/model/prefs';
 import { useSavedViews, viewHref } from '@/model/views';
 import { useUi } from './state';
 
@@ -36,8 +49,9 @@ export function Sidebar() {
   const { data: auth } = useAuth();
   const { data: schema } = useSchema();
   const { data: board } = useBoard(Boolean(schema));
-  const { filters, setFilters, setNewIssueOpen, groupBy } = useUi();
-  const { views, save, remove } = useSavedViews();
+  const { filters, setFilters, setNewIssueOpen, groupBy, sidebarOpen, setSidebarOpen, setShortcutsOpen, startTour } =
+    useUi();
+  const { views, save, remove, setPinned } = useSavedViews();
   const [theme, setTheme] = useTheme();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -54,40 +68,58 @@ export function Sidebar() {
   const myIssuesActive =
     me != null && filters.assignees.length === 1 && filters.assignees[0] === me;
 
-  const cycleTheme = () =>
-    setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system');
   const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
+  const THEMES: { id: Theme; label: string; icon: ReactNode }[] = [
+    { id: 'light', label: 'Light', icon: <Sun /> },
+    { id: 'dark', label: 'Dark', icon: <Moon /> },
+    { id: 'system', label: 'Match system', icon: <Monitor /> },
+  ];
+
+  // The sidebar is a sheet on narrow screens; going somewhere should put it away.
+  useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
 
   const [naming, setNaming] = useState<string | null>(null);
   const saveCurrentView = () => {
     const name = naming?.trim();
     if (!name) return;
-    save({ name, path: location.pathname, filters, groupBy });
-    toast.success(`Saved “${name}”`);
+    save({ name, path: location.pathname, filters, groupBy })
+      .then(() => toast.success(`Saved “${name}”`))
+      .catch((e: Error) => toast.error(`Couldn’t save the view: ${e.message}`));
     setNaming(null);
   };
 
   return (
-    <nav className="sidebar" aria-label="Main">
+    <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`} aria-label="Main">
       <div className="sidebar-head">
         <Logo small />
         <div className="truncate">
           Radius
           <span className="sub truncate">{schema?.title ?? 'Bugtracker'}</span>
         </div>
+        <IconButton
+          label="Close menu"
+          className="nav-close"
+          size="sm"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <X />
+        </IconButton>
       </div>
-      <Button className="new-issue-btn" icon={<Plus />} onClick={() => setNewIssueOpen(true)}>
+      <Button className="new-issue-btn" icon={<Plus />} onClick={() => setNewIssueOpen(true)} data-tour="new-issue">
         New issue
         <kbd className="kbd" style={{ marginLeft: 'auto' }}>
           C
         </kbd>
       </Button>
 
-      <NavLink to="/inbox" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink to="/home" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-tour="nav-home">
+        <Home /> Home
+      </NavLink>
+      <NavLink to="/inbox" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-tour="nav-intake">
         <Inbox /> Intake
         <span className="count">{intakeCount || ''}</span>
       </NavLink>
-      <NavLink to="/board" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink to="/board" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-tour="nav-board">
         <LayoutGrid /> Board
       </NavLink>
       <NavLink to="/list" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -96,7 +128,11 @@ export function Sidebar() {
       <NavLink to="/sheet" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
         <Sheet /> Spreadsheet
       </NavLink>
-      <NavLink to="/analytics" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink
+        to="/analytics"
+        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+        data-tour="nav-analytics"
+      >
         <BarChart3 /> Analytics
       </NavLink>
       <button
@@ -139,7 +175,7 @@ export function Sidebar() {
         </button>
       )}
 
-      <div className="sidebar-section">
+      <div className="sidebar-section" data-tour="views">
         <span>Views</span>
         <IconButton
           label="Save the current filters as a view"
@@ -155,7 +191,7 @@ export function Sidebar() {
       {views.map((v) => (
         <div key={v.id} className="nav-row">
           <button className="nav-item" onClick={() => navigate(viewHref(v))}>
-            <Bookmark /> <span className="truncate">{v.name}</span>
+            {v.pinned ? <Pin /> : <Bookmark />} <span className="truncate">{v.name}</span>
           </button>
           <Menu>
             <MenuTrigger asChild>
@@ -164,6 +200,9 @@ export function Sidebar() {
               </button>
             </MenuTrigger>
             <MenuContent align="end">
+              <MenuItem onSelect={() => setPinned(v.id, !v.pinned)}>
+                {v.pinned ? <PinOff /> : <Pin />} {v.pinned ? 'Unpin from Home' : 'Pin to Home'}
+              </MenuItem>
               <MenuItem
                 onSelect={() => {
                   void navigator.clipboard?.writeText(`${window.location.origin}${viewHref(v)}`);
@@ -231,15 +270,33 @@ export function Sidebar() {
               <ExternalLink /> Open project home
             </MenuItem>
             <MenuItem onSelect={() => qc.invalidateQueries()}>Refresh data</MenuItem>
+            <MenuItem onSelect={() => startTour()}>
+              <Compass /> Show tour
+            </MenuItem>
+            <MenuItem onSelect={() => setShortcutsOpen(true)} hint="?">
+              <Keyboard /> Keyboard shortcuts
+            </MenuItem>
             <MenuSeparator />
             <MenuItem onSelect={() => (window.location.href = '/api/auth/logout')}>
               <LogOut /> Sign out
             </MenuItem>
           </MenuContent>
         </Menu>
-        <IconButton label={`Theme: ${theme}`} onClick={cycleTheme}>
-          <ThemeIcon />
-        </IconButton>
+        <Menu>
+          <MenuTrigger asChild>
+            <button className="icon-btn" aria-label={`Theme: ${theme}`}>
+              <ThemeIcon />
+            </button>
+          </MenuTrigger>
+          <MenuContent side="top" align="end">
+            <MenuLabel>Theme</MenuLabel>
+            {THEMES.map((t) => (
+              <MenuItem key={t.id} onSelect={() => setTheme(t.id)} hint={theme === t.id ? '✓' : undefined}>
+                {t.icon} {t.label}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
       </div>
     </nav>
   );

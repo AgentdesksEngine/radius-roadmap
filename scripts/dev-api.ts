@@ -33,20 +33,30 @@ function collectRoutes(dir = API_DIR, prefix: string[] = []): Route[] {
       out.push({ pattern: name === 'index' ? prefix : [...prefix, name], file: full });
     }
   }
-  // Static segments win over dynamic ones.
-  return out.sort((a, b) => a.pattern.filter((s) => s.startsWith('[')).length - b.pattern.filter((s) => s.startsWith('[')).length);
+  // Static segments win over dynamic ones, and a catch-all is the last resort.
+  const rank = (p: string[]) =>
+    p.filter((s) => s.startsWith('[')).length + (p.some((s) => s.startsWith('[...')) ? 100 : 0);
+  return out.sort((a, b) => rank(a.pattern) - rank(b.pattern));
 }
 
-function match(route: Route, segments: string[]): Record<string, string> | null {
-  if (route.pattern.length !== segments.length) return null;
-  const params: Record<string, string> = {};
-  for (let i = 0; i < segments.length; i++) {
+function match(route: Route, segments: string[]): Record<string, string | string[]> | null {
+  const params: Record<string, string | string[]> = {};
+  for (let i = 0; i < route.pattern.length; i++) {
     const p = route.pattern[i]!;
-    const s = segments[i]!;
+    // A catch-all ([...path]) swallows the rest, exactly as Vercel binds it — an array of at
+    // least one segment. Without this, /api/issues/:id/comments never matched locally.
+    if (p.startsWith('[...') && p.endsWith(']')) {
+      const rest = segments.slice(i);
+      if (!rest.length) return null;
+      params[p.slice(4, -1)] = rest.map((x) => decodeURIComponent(x));
+      return params;
+    }
+    const s = segments[i];
+    if (s === undefined) return null;
     if (p.startsWith('[') && p.endsWith(']')) params[p.slice(1, -1)] = decodeURIComponent(s);
     else if (p !== s) return null;
   }
-  return params;
+  return route.pattern.length === segments.length ? params : null;
 }
 
 function parseCookies(header: string | undefined) {
@@ -82,7 +92,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? '/', `http://localhost:${PORT}`);
   const segments = url.pathname.replace(/^\/api\/?/, '').split('/').filter(Boolean);
 
-  let params: Record<string, string> | null = null;
+  let params: Record<string, string | string[]> | null = null;
   let route: Route | undefined;
   for (const r of routes) {
     params = match(r, segments);

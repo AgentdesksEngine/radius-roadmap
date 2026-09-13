@@ -14,7 +14,13 @@ export function SearchBox() {
         value={filters.query}
         onChange={(e) => setFilters((f) => ({ ...f, query: e.target.value }))}
         onKeyDown={(e) => {
-          if (e.key === 'Escape') (e.target as HTMLInputElement).blur();
+          if (e.key !== 'Escape') return;
+          // First Escape clears the query, second leaves the field. Marking it handled
+          // stops the shell from blurring on the first press.
+          if (filters.query) {
+            e.preventDefault();
+            setFilters((f) => ({ ...f, query: '' }));
+          }
         }}
       />
       {!filters.query && <Kbd>/</Kbd>}

@@ -1,5 +1,6 @@
 import { getBoard, getSchema } from '../_lib/db/board.js';
 import { HttpError, noStore, param, route } from '../_lib/http.js';
+import { sweepNotifications } from '../_lib/notify.js';
 import { requireUser } from '../_lib/session.js';
 
 /**
@@ -18,6 +19,10 @@ export default route({
       const board = await getBoard(profileId);
       noStore(res);
       res.status(200).json(board);
+      // Coalesced Slack DMs come due ~2 minutes after the event that opened the batch, which
+      // outlives the invocation that enqueued them. The board is the most-hit endpoint in the
+      // app, so it doubles as the outbox drain. Throttled, backgrounded, never awaited.
+      sweepNotifications();
       return;
     }
     if (action === 'schema') {

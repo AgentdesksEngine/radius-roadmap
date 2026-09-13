@@ -4,8 +4,11 @@ import { z } from 'zod';
  * Superset of the Supabase-era vars the live API needs and the GitHub-era vars the
  * one-off migration tooling (scripts/migrate-github-to-supabase.ts and its
  * dump-schema/provision-fields/_lib.ts helpers) still needs to read the old board during
- * the cutover. The GITHUB_* block goes away in Phase 4 of the cutover plan, once the
- * migration is done and api/_lib/github/* is deleted for good.
+ * the cutover. That migration-only block goes away in Phase 4 of the cutover plan, once the
+ * migration is done and api/_lib/github/{app,board,gql}.ts is deleted for good.
+ *
+ * GITHUB_WEBHOOK_SECRET and GITHUB_ORG are NOT part of that block: they are live again, used
+ * by the PR webhook, and outlive the migration.
  */
 const schema = z.object({
   // --- Supabase (live API) ---
@@ -17,13 +20,16 @@ const schema = z.object({
   DEV_LOGIN_EMAIL: z.string().optional(),
   DEV_LOGIN_PASSWORD: z.string().optional(),
 
+  // --- GitHub PR webhook (live: api/github/[action].ts) ---
+  GITHUB_WEBHOOK_SECRET: z.string().optional(),
+  /** Only PRs from repos owned by this org are acted on. */
+  GITHUB_ORG: z.string().default('AgentdesksEngine'),
+
   // --- GitHub (migration tooling only; unused by the live API) ---
   GITHUB_APP_ID: z.string().optional(),
   GITHUB_APP_CLIENT_ID: z.string().optional(),
   GITHUB_APP_CLIENT_SECRET: z.string().optional(),
   GITHUB_APP_PRIVATE_KEY: z.string().optional(),
-  GITHUB_WEBHOOK_SECRET: z.string().optional(),
-  GITHUB_ORG: z.string().default('AgentdesksEngine'),
   GITHUB_PROJECT_NUMBER: z.coerce.number().int().positive().default(6),
   GITHUB_ISSUES_REPO: z.string().default('radius-roadmap'),
   DEV_GITHUB_TOKEN: z.string().optional(),
@@ -91,6 +97,15 @@ export function requireSlackEnv() {
     throw new Error('SLACK_SIGNING_SECRET / SLACK_BOT_TOKEN are not set. See .env.example.');
   }
   return e as Env & { SLACK_SIGNING_SECRET: string; SLACK_BOT_TOKEN: string };
+}
+
+/** Same reasoning as requireSlackEnv: an unset secret must fail loudly, not verify as empty. */
+export function requireGithubEnv() {
+  const e = env();
+  if (!e.GITHUB_WEBHOOK_SECRET) {
+    throw new Error('GITHUB_WEBHOOK_SECRET is not set. See .env.example.');
+  }
+  return e as Env & { GITHUB_WEBHOOK_SECRET: string };
 }
 
 /** Channel allowlist, parsed. An empty set means "no restriction". */

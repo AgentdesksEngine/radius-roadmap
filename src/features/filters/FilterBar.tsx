@@ -94,7 +94,7 @@ export function FilterBar() {
   const closedCount = board?.items.filter((i) => i.state === 'CLOSED').length ?? 0;
 
   return (
-    <div className="filter-bar">
+    <div className="filter-bar" data-tour="filters">
       {chips.map((c) => (
         <span key={c.key} className="chip">
           <span className="k">{c.label}</span>
