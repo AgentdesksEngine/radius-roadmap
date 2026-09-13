@@ -4,7 +4,15 @@ import { CheckCircle2, CornerDownRight, ListTree, MessageSquare, XCircle } from 
 import type { BoardItem, ProjectSchema } from '@shared/types';
 import { AvatarStack } from '@/components/ui/Avatar';
 import { Tag } from '@/components/ui/Tag';
-import { PRIORITY, TEAM, WORK_TYPE, field, selectName, selectOption } from '@/model/board';
+import {
+  PRIORITY,
+  TEAM,
+  WORK_TYPE,
+  field,
+  selectName,
+  selectOption,
+  selectOptions,
+} from '@/model/board';
 import { REACTION_EMOJI } from '../issue/Reactions';
 import { PriorityIcon } from './PriorityIcon';
 
@@ -19,7 +27,7 @@ interface Props {
 }
 
 export function CardBody({ item, schema, showTeam }: Pick<Props, 'item' | 'schema' | 'showTeam'>) {
-  const team = selectOption(item, field(schema, TEAM));
+  const teams = selectOptions(item, field(schema, TEAM));
   const workType = selectOption(item, field(schema, WORK_TYPE));
   const topReaction = item.reactions[0];
   return (
@@ -42,7 +50,12 @@ export function CardBody({ item, schema, showTeam }: Pick<Props, 'item' | 'schem
             {workType.name}
           </Tag>
         )}
-        {showTeam && team && <Tag color={team.color}>{team.name}</Tag>}
+        {showTeam &&
+          teams.map((t) => (
+            <Tag key={t.id} color={t.color}>
+              {t.name}
+            </Tag>
+          ))}
         <span className="right">
           {item.subIssues.total > 0 && (
             <span title={`${item.subIssues.completed} of ${item.subIssues.total} sub-issues done`}>

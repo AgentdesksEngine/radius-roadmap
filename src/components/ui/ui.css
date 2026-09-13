@@ -124,6 +124,13 @@
   box-shadow: 0 0 0 1.5px var(--bg);
 }
 
+/* Several option dots side by side, for a multi-valued select shown in a cell. */
+.dot-stack {
+  display: inline-flex;
+  gap: 2px;
+  align-items: center;
+}
+
 /* Tag / dot */
 .dot {
   display: inline-block;

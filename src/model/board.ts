@@ -2,6 +2,7 @@ import type {
   BoardItem,
   FieldOption,
   FieldValue,
+  FieldWriteValue,
   OptionColor,
   ProjectField,
   ProjectSchema,
@@ -41,8 +42,16 @@ export function customFields(schema: ProjectSchema): ProjectField[] {
   return schema.fields.filter((f) => !BUILT_IN.has(f.dataType));
 }
 
+/** Fields the board can group by / drag between — one option per item, so one column per item. */
 export function selectFields(schema: ProjectSchema): ProjectField[] {
   return schema.fields.filter((f) => f.dataType === 'SINGLE_SELECT');
+}
+
+/** Fields that can be filtered on. Unlike grouping, a multi-select filter is well defined. */
+export function filterableFields(schema: ProjectSchema): ProjectField[] {
+  return schema.fields.filter(
+    (f) => f.dataType === 'SINGLE_SELECT' || f.dataType === 'MULTI_SELECT',
+  );
 }
 
 export function field(schema: ProjectSchema | undefined, name: string): ProjectField | undefined {
@@ -58,6 +67,14 @@ export function selectName(item: BoardItem, name: string): string | undefined {
   return v?.kind === 'singleSelect' ? v.name : undefined;
 }
 
+/** Option names set on `item` for a select field, single- or multi-valued. */
+export function selectNames(item: BoardItem, name: string): string[] {
+  const v = item.fields[name];
+  if (v?.kind === 'singleSelect') return [v.name];
+  if (v?.kind === 'multiSelect') return v.options.map((o) => o.name);
+  return [];
+}
+
 export function selectOption(
   item: BoardItem,
   f: ProjectField | undefined,
@@ -65,6 +82,35 @@ export function selectOption(
   if (!f) return undefined;
   const v = item.fields[f.name];
   return v?.kind === 'singleSelect' ? f.options?.find((o) => o.id === v.optionId) : undefined;
+}
+
+/**
+ * Options set on `item` for a select field, resolved against the schema so callers get the
+ * colour too — the stored multi-select value carries only id and name.
+ */
+export function selectOptions(item: BoardItem, f: ProjectField | undefined): FieldOption[] {
+  if (!f) return [];
+  const v = item.fields[f.name];
+  const ids =
+    v?.kind === 'singleSelect'
+      ? [v.optionId]
+      : v?.kind === 'multiSelect'
+        ? v.options.map((o) => o.id)
+        : [];
+  return ids
+    .map((id) => f.options?.find((o) => o.id === id))
+    .filter((o): o is FieldOption => Boolean(o));
+}
+
+/**
+ * Shapes a field write to match the field's arity, so callers that set an option don't
+ * have to care whether the field is single- or multi-valued.
+ */
+export function selectWrite(f: ProjectField, optionIds: string[]): FieldWriteValue | null {
+  if (!optionIds.length) return null;
+  return f.dataType === 'MULTI_SELECT'
+    ? { multiSelectOptionIds: optionIds }
+    : { singleSelectOptionId: optionIds[0]! };
 }
 
 export function colorVar(color: OptionColor | undefined): string {
@@ -210,15 +256,19 @@ export function filterItems(items: BoardItem[], filters: Filters, now = Date.now
   const selectEntries = Object.entries(filters.select).filter(([, v]) => v.length);
   return items.filter((it) => {
     if (it.isArchived !== filters.archived) return false;
-    if (filters.team && selectName(it, TEAM) !== filters.team) return false;
+    if (filters.team && !selectNames(it, TEAM).includes(filters.team)) return false;
     if (!matchesState(it, filters.state, now)) return false;
     for (const [fname, names] of selectEntries) {
-      const v = selectName(it, fname) ?? '__none';
-      if (!names.includes(v)) return false;
+      // A multi-valued field matches if any of its options was picked.
+      const vs = selectNames(it, fname);
+      const hit = vs.length ? vs.some((v) => names.includes(v)) : names.includes('__none');
+      if (!hit) return false;
     }
     if (filters.assignees.length) {
       const ids = it.assignees.map((a) => a.id);
-      const hit = filters.assignees.some((a) => (a === '__none' ? ids.length === 0 : ids.includes(a)));
+      const hit = filters.assignees.some((a) =>
+        a === '__none' ? ids.length === 0 : ids.includes(a),
+      );
       if (!hit) return false;
     }
     return matchesQuery(it, q);
@@ -241,7 +291,7 @@ export function activeFilterCount(f: Filters) {
  * kind of work it is. Everything else about triage is a judgement call; this part isn't.
  */
 export function missingTriageFields(item: BoardItem): string[] {
-  return TRIAGE_FIELDS.filter((name) => !selectName(item, name));
+  return TRIAGE_FIELDS.filter((name) => selectNames(item, name).length === 0);
 }
 
 export function needsTriage(item: BoardItem): boolean {
@@ -265,10 +315,11 @@ export type SortKey = 'manual' | 'updated' | 'created' | 'priority' | 'number' |
 
 export function optionRank(schema: ProjectSchema, fieldName: string, item: BoardItem): number {
   const f = field(schema, fieldName);
-  const v = item.fields[fieldName];
-  if (!f?.options || v?.kind !== 'singleSelect') return Number.MAX_SAFE_INTEGER;
-  const idx = f.options.findIndex((o) => o.id === v.optionId);
-  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+  if (!f?.options) return Number.MAX_SAFE_INTEGER;
+  // A multi-valued field sorts by its highest-ranked option.
+  const ranks = selectOptions(item, f).map((o) => f.options!.findIndex((x) => x.id === o.id));
+  const best = Math.min(...ranks.filter((i) => i !== -1));
+  return Number.isFinite(best) ? best : Number.MAX_SAFE_INTEGER;
 }
 
 export function sortItems(
@@ -309,8 +360,10 @@ export function teamCounts(items: BoardItem[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const it of items) {
     if (it.state !== 'OPEN' || it.isArchived) continue;
-    const t = selectName(it, TEAM) ?? '__none';
-    m.set(t, (m.get(t) ?? 0) + 1);
+    // An issue owned by several teams counts once under each, so the per-team
+    // tallies can add up to more than the board total.
+    const ts = selectNames(it, TEAM);
+    for (const t of ts.length ? ts : ['__none']) m.set(t, (m.get(t) ?? 0) + 1);
   }
   return m;
 }
