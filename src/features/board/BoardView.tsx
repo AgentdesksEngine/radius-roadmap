@@ -2,15 +2,18 @@ import { useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   pointerWithin,
   rectIntersection,
   useSensor,
   useSensors,
+  type Announcements,
   type CollisionDetection,
   type DragEndEvent,
 } from '@dnd-kit/core';
-import { ArrowUpDown, Rows3 } from 'lucide-react';
+import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
+import { ArrowUpDown, ListFilter, Rows3 } from 'lucide-react';
 import type { BoardItem } from '@shared/types';
 import { useBoard, useMoveItem, useSchema, useSetField } from '@/api/hooks';
 import { Button } from '@/components/ui/Button';
@@ -18,6 +21,7 @@ import { Picker, type PickerItem } from '@/components/ui/Picker';
 import { useToast } from '@/components/ui/Toast';
 import {
   ASSIGNEE_GROUP,
+  activeFilterCount,
   field,
   filterItems,
   groupItems,
@@ -27,7 +31,7 @@ import {
 } from '@/model/board';
 import { BulkBar } from '../bulk/BulkBar';
 import { ViewHeader } from '../shell/ViewHeader';
-import { useUi } from '../shell/state';
+import { useUi, useVisibleItems } from '../shell/state';
 import { CardBody } from './Card';
 import { Column } from './Column';
 import './board.css';
@@ -53,6 +57,7 @@ export function BoardView() {
   const board = useBoard(Boolean(schema));
   const {
     filters,
+    setFilters,
     groupBy,
     setGroupBy,
     sort,
@@ -66,7 +71,10 @@ export function BoardView() {
   const move = useMoveItem();
   const toast = useToast();
   const [active, setActive] = useState<BoardItem | null>(null);
-  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const items = useMemo(
     () =>
@@ -82,6 +90,34 @@ export function BoardView() {
   const groupField = schema ? field(schema, groupBy) : undefined;
   const canDrag = Boolean(groupField?.options);
   const canSort = sort.key === 'manual';
+  const filtered =
+    activeFilterCount(filters) > 0 || Boolean(filters.query) || filters.team !== null;
+
+  useVisibleItems(groups.flatMap((g) => g.items));
+
+  // Spoken while a card is being moved with the keyboard; dnd-kit says nothing useful by default.
+  const announcements: Announcements = {
+    onDragStart: ({ active: a }) => {
+      const i = items.find((x) => x.itemId === a.id);
+      return i ? `Picked up ${i.key}. Use the arrow keys to move it, space to drop.` : undefined;
+    },
+    onDragOver: ({ over }) => {
+      const g = over ? groups.find((x) => x.key === over.id) : undefined;
+      return g ? `Over ${g.label}.` : undefined;
+    },
+    onDragEnd: ({ active: a, over }) => {
+      const i = items.find((x) => x.itemId === a.id);
+      const g = over
+        ? (groups.find((x) => x.key === over.id) ??
+          groups.find((x) => x.items.some((y) => y.itemId === over.id)))
+        : undefined;
+      return i && g ? `Dropped ${i.key} in ${g.label}.` : 'Dropped.';
+    },
+    onDragCancel: ({ active: a }) => {
+      const i = items.find((x) => x.itemId === a.id);
+      return i ? `Put ${i.key} back.` : 'Cancelled.';
+    },
+  };
 
   const groupOptions: PickerItem[] = schema
     ? [
@@ -150,7 +186,10 @@ export function BoardView() {
           </Button>
         </Picker>
         <Picker
-          items={SORTS}
+          items={SORTS.map((s) => ({
+            ...s,
+            hint: s.id === 'manual' ? 'drag to reorder' : undefined,
+          }))}
           value={sort.key}
           onSelect={(id) => setSort({ key: id as SortKey, dir: id === 'manual' ? 'asc' : 'desc' })}
           placeholder="Order by…"
@@ -159,6 +198,7 @@ export function BoardView() {
             {SORTS.find((s) => s.id === sort.key)?.label ?? 'Order'}
           </Button>
         </Picker>
+        {!canSort && <span className="faint order-note">Reordering needs Manual order</span>}
       </ViewHeader>
 
       {board.isError && (
@@ -190,13 +230,35 @@ export function BoardView() {
                 ? 'No issues on the board yet.'
                 : 'No issues match the current filters.'}
           </span>
-          <Button size="sm" onClick={() => setNewIssueOpen(true)}>
-            New issue
-          </Button>
+          {filtered && !filters.archived ? (
+            <Button
+              size="sm"
+              variant="primary"
+              icon={<ListFilter />}
+              onClick={() =>
+                setFilters((f) => ({
+                  ...f,
+                  select: {},
+                  assignees: [],
+                  team: null,
+                  query: '',
+                  state: 'active',
+                  archived: false,
+                }))
+              }
+            >
+              Clear filters
+            </Button>
+          ) : (
+            <Button size="sm" onClick={() => setNewIssueOpen(true)}>
+              New issue
+            </Button>
+          )}
         </div>
       ) : (
         <DndContext
           sensors={sensors}
+          accessibility={{ announcements }}
           collisionDetection={collisionDetection}
           onDragStart={(e) => setActive(items.find((i) => i.itemId === e.active.id) ?? null)}
           onDragEnd={onDragEnd}

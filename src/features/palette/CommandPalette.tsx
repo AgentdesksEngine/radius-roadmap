@@ -7,6 +7,7 @@ import {
   BarChart3,
   ExternalLink,
   Inbox,
+  Keyboard,
   LayoutGrid,
   List,
   LogOut,
@@ -23,7 +24,15 @@ import { useUi } from '../shell/state';
 import './palette.css';
 
 export function CommandPalette() {
-  const { paletteOpen, setPaletteOpen, openIssue, setNewIssueOpen, filters, setFilters } = useUi();
+  const {
+    paletteOpen,
+    setPaletteOpen,
+    openIssue,
+    setNewIssueOpen,
+    setShortcutsOpen,
+    filters,
+    setFilters,
+  } = useUi();
   const { data: board } = useBoard();
   const { data: schema } = useSchema();
   const navigate = useNavigate();
@@ -116,6 +125,13 @@ export function CommandPalette() {
                   archived: !f.archived,
                   state: f.archived ? 'active' : 'all',
                 })),
+            },
+            {
+              id: 'shortcuts',
+              label: 'Keyboard shortcuts',
+              icon: <Keyboard />,
+              hint: '?',
+              fn: () => setShortcutsOpen(true),
             },
             {
               id: 'theme',

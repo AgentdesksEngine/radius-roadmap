@@ -84,15 +84,34 @@ export function Card({ item, schema, showTeam, canDrag, selected, onSelect, onOp
     <div
       ref={setNodeRef}
       style={{ transform: CSS.Translate.toString(transform), transition }}
-      className={`card ${isDragging ? 'dragging' : ''} ${item.state === 'CLOSED' ? 'closed' : ''} ${selected ? 'selected' : ''}`}
+      className={`card ${canDrag ? 'draggable' : ''} ${isDragging ? 'dragging' : ''} ${item.state === 'CLOSED' ? 'closed' : ''} ${selected ? 'selected' : ''}`}
       {...attributes}
       {...listeners}
+      aria-label={`${item.key}: ${item.title}`}
       // Cmd/Ctrl-click builds a selection for bulk edits; a plain click opens the issue.
       onClick={(e) => (e.metaKey || e.ctrlKey ? onSelect?.(item.itemId, true) : onOpen(item.key))}
       onKeyDown={(e) => {
         if (e.key === 'Enter') onOpen(item.key);
+        // Matches the list views, and gives the selection a keyboard route in.
+        if (e.key === 'x') {
+          e.preventDefault();
+          onSelect?.(item.itemId, true);
+        }
       }}
     >
+      {onSelect && (
+        <input
+          type="checkbox"
+          className="card-check"
+          aria-label={`Select ${item.key}`}
+          checked={Boolean(selected)}
+          // The card owns both click-to-open and the drag listeners; the box wants neither.
+          onPointerDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}
+          onChange={() => onSelect(item.itemId, true)}
+        />
+      )}
       <CardBody item={item} schema={schema} showTeam={showTeam} />
     </div>
   );

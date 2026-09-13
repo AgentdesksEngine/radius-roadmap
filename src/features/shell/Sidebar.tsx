@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -7,6 +7,7 @@ import {
   Bookmark,
   ExternalLink,
   Inbox,
+  Keyboard,
   LayoutGrid,
   List,
   LogOut,
@@ -18,17 +19,25 @@ import {
   Sun,
   Trash2,
   UserCircle,
+  X,
 } from 'lucide-react';
 import { useAuth, useBoard, useSchema } from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Logo } from '@/components/ui/Logo';
-import { Menu, MenuContent, MenuItem, MenuSeparator, MenuTrigger } from '@/components/ui/Menu';
+import {
+  Menu,
+  MenuContent,
+  MenuItem,
+  MenuLabel,
+  MenuSeparator,
+  MenuTrigger,
+} from '@/components/ui/Menu';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
 import { TEAM, field, intakeItems, teamCounts } from '@/model/board';
-import { useTheme } from '@/model/prefs';
+import { useTheme, type Theme } from '@/model/prefs';
 import { useSavedViews, viewHref } from '@/model/views';
 import { useUi } from './state';
 
@@ -36,7 +45,15 @@ export function Sidebar() {
   const { data: auth } = useAuth();
   const { data: schema } = useSchema();
   const { data: board } = useBoard(Boolean(schema));
-  const { filters, setFilters, setNewIssueOpen, groupBy } = useUi();
+  const {
+    filters,
+    setFilters,
+    setNewIssueOpen,
+    groupBy,
+    sidebarOpen,
+    setSidebarOpen,
+    setShortcutsOpen,
+  } = useUi();
   const { views, save, remove } = useSavedViews();
   const [theme, setTheme] = useTheme();
   const qc = useQueryClient();
@@ -54,9 +71,15 @@ export function Sidebar() {
   const myIssuesActive =
     me != null && filters.assignees.length === 1 && filters.assignees[0] === me;
 
-  const cycleTheme = () =>
-    setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system');
   const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
+  const THEMES: { id: Theme; label: string; icon: ReactNode }[] = [
+    { id: 'light', label: 'Light', icon: <Sun /> },
+    { id: 'dark', label: 'Dark', icon: <Moon /> },
+    { id: 'system', label: 'Match system', icon: <Monitor /> },
+  ];
+
+  // The sidebar is a sheet on narrow screens; going somewhere should put it away.
+  useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
 
   const [naming, setNaming] = useState<string | null>(null);
   const saveCurrentView = () => {
@@ -68,13 +91,21 @@ export function Sidebar() {
   };
 
   return (
-    <nav className="sidebar" aria-label="Main">
+    <nav className={`sidebar ${sidebarOpen ? 'open' : ''}`} aria-label="Main">
       <div className="sidebar-head">
         <Logo small />
         <div className="truncate">
           Radius
           <span className="sub truncate">{schema?.title ?? 'Bugtracker'}</span>
         </div>
+        <IconButton
+          label="Close menu"
+          className="nav-close"
+          size="sm"
+          onClick={() => setSidebarOpen(false)}
+        >
+          <X />
+        </IconButton>
       </div>
       <Button className="new-issue-btn" icon={<Plus />} onClick={() => setNewIssueOpen(true)}>
         New issue
@@ -231,15 +262,34 @@ export function Sidebar() {
               <ExternalLink /> Open project home
             </MenuItem>
             <MenuItem onSelect={() => qc.invalidateQueries()}>Refresh data</MenuItem>
+            <MenuItem onSelect={() => setShortcutsOpen(true)} hint="?">
+              <Keyboard /> Keyboard shortcuts
+            </MenuItem>
             <MenuSeparator />
             <MenuItem onSelect={() => (window.location.href = '/api/auth/logout')}>
               <LogOut /> Sign out
             </MenuItem>
           </MenuContent>
         </Menu>
-        <IconButton label={`Theme: ${theme}`} onClick={cycleTheme}>
-          <ThemeIcon />
-        </IconButton>
+        <Menu>
+          <MenuTrigger asChild>
+            <button className="icon-btn" aria-label={`Theme: ${theme}`}>
+              <ThemeIcon />
+            </button>
+          </MenuTrigger>
+          <MenuContent side="top" align="end">
+            <MenuLabel>Theme</MenuLabel>
+            {THEMES.map((t) => (
+              <MenuItem
+                key={t.id}
+                onSelect={() => setTheme(t.id)}
+                hint={theme === t.id ? '✓' : undefined}
+              >
+                {t.icon} {t.label}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
       </div>
     </nav>
   );

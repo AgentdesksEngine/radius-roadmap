@@ -101,11 +101,12 @@
   height: 100%;
 }
 .view-header {
-  height: var(--header-h);
+  min-height: var(--header-h);
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
-  padding: 0 12px;
+  padding: 5px 12px;
   border-bottom: 1px solid var(--border);
   flex: none;
 }
@@ -130,6 +131,14 @@
   display: flex;
   align-items: center;
   gap: 4px;
+  height: 26px;
+  padding: 0 6px;
+  border-radius: var(--radius);
+  font-variant-numeric: tabular-nums;
+}
+.view-header .sync:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--text-2);
 }
 .search {
   position: relative;
@@ -218,9 +227,91 @@
   .sidebar {
     display: none;
   }
+  .sidebar.open {
+    display: flex;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: min(280px, 86vw);
+    z-index: 46;
+    box-shadow: var(--shadow-pop);
+    animation: slide-in-left 0.16s ease-out;
+  }
+  .nav-toggle,
+  .nav-close {
+    display: inline-flex;
+  }
   .search {
     width: 140px;
+    flex: 1;
+    min-width: 110px;
   }
+  .view-header {
+    row-gap: 6px;
+  }
+  .view-header .spacer {
+    display: none;
+  }
+  .filter-bar {
+    order: 3;
+    width: 100%;
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+/* Keyboard shortcuts sheet */
+.shortcuts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(248px, 1fr));
+  gap: 18px 28px;
+}
+.shortcuts h3 {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  margin: 0 0 6px;
+}
+.shortcut-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 3px 0;
+  color: var(--text-2);
+}
+.shortcut-row .keys {
+  display: inline-flex;
+  gap: 3px;
+  flex: none;
+  width: 78px;
+  justify-content: flex-end;
+}
+
+.nav-toggle,
+.nav-close {
+  display: none;
+}
+.sidebar-head .nav-close {
+  margin-left: auto;
+}
+.sidebar-scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--bg-overlay);
+  z-index: 44;
+  animation: fade-in 0.12s;
 }
 
 .nav-row {
@@ -232,6 +323,7 @@
   flex: none;
 }
 .nav-row:hover .row-menu,
+.nav-row:focus-within .row-menu,
 .nav-row .row-menu[data-state='open'] {
   opacity: 1;
 }

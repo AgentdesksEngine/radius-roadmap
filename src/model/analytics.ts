@@ -8,6 +8,8 @@ export interface Bucket {
   label: string;
   color?: OptionColor;
   count: number;
+  /** Filter value this bucket stands for, so a bar can link to the issues behind it. */
+  value?: string;
 }
 
 export interface WeekPoint {
@@ -65,8 +67,9 @@ export function openByField(items: BoardItem[], f: ProjectField | undefined): Bu
     label: o.name,
     color: o.color,
     count: counts.get(o.name) ?? 0,
+    value: o.name,
   }));
-  if (none) buckets.push({ label: `No ${f.name.toLowerCase()}`, count: none });
+  if (none) buckets.push({ label: `No ${f.name.toLowerCase()}`, count: none, value: '__none' });
   return buckets.filter((b) => b.count > 0);
 }
 

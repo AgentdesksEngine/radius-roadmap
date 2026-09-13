@@ -173,9 +173,54 @@
   height: 14px;
   width: 100%;
   display: block;
+  border-radius: 3px;
+  background: var(--bg-subtle);
+  overflow: hidden;
+}
+.bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 0 3px 3px 0;
+  transition: width 0.2s;
 }
 .bar-value {
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   text-align: right;
+}
+
+/* STATS-01: figures that lead somewhere look like they do. */
+.stat.pickable,
+.bar-row.pickable {
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  width: 100%;
+}
+.stat.pickable:hover {
+  border-color: var(--border-strong);
+  background: var(--bg-subtle);
+}
+.bar-row.pickable {
+  border: 0;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--radius-sm);
+}
+.bar-row.pickable:hover {
+  background: var(--bg-subtle);
+}
+.bar-row.pickable:hover .bar-label {
+  color: var(--text);
+}
+.chart-plot rect[tabindex]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .bar-fill,
+  .progress span {
+    transition: none;
+  }
 }

@@ -37,8 +37,15 @@
   margin-left: auto;
   opacity: 0;
 }
-.column:hover .column-head .icon-btn {
+.column:hover .column-head .icon-btn,
+.column:focus-within .column-head .icon-btn,
+.column-head .icon-btn:focus-visible {
   opacity: 1;
+}
+@media (hover: none) {
+  .column-head .icon-btn {
+    opacity: 0.6;
+  }
 }
 .column-body {
   flex: 1;
@@ -58,6 +65,7 @@
   padding: 14px 8px;
 }
 .card {
+  position: relative;
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -65,9 +73,20 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  cursor: default;
+  cursor: pointer;
   outline-offset: 0;
   transition: border-color 0.12s;
+}
+.card.draggable {
+  cursor: grab;
+}
+.card.draggable:active {
+  cursor: grabbing;
+}
+.card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
 }
 .card:hover {
   border-color: var(--border-strong);
@@ -189,4 +208,54 @@
 }
 .quick-add .faint {
   font-size: 10.5px;
+}
+
+.card-check {
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  margin: 0;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.card:hover .card-check,
+.card:focus-within .card-check,
+.card.selected .card-check,
+.card-check:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .card-check {
+    opacity: 0.5;
+  }
+}
+/* The checkbox takes the top-left corner, so the key shifts over to make room. */
+.card:hover .card-top .mono,
+.card:focus-within .card-top .mono,
+.card.selected .card-top .mono {
+  padding-left: 20px;
+}
+@media (hover: none) {
+  .card-top .mono {
+    padding-left: 20px;
+  }
+}
+.card-top .mono {
+  transition: padding-left 0.12s;
+}
+.order-note {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.quick-add-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.quick-add-actions .faint {
+  font-size: 10.5px;
+  margin-right: auto;
 }

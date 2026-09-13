@@ -1,16 +1,25 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { colorVar } from '@/model/board';
 import type { Bucket, WeekPoint } from '@/model/analytics';
+
+/** True while the viewport is narrower than `px`. */
+function useNarrow(px = 600): boolean {
+  const [narrow, setNarrow] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia(`(max-width: ${px}px)`).matches,
+  );
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${px}px)`);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [px]);
+  return narrow;
+}
 
 /** Rounded only at the data end, square on the baseline. */
 function topRounded(x: number, y: number, w: number, h: number, r = 4): string {
   const rr = Math.min(r, w / 2, h);
   return `M${x} ${y + h} L${x} ${y + rr} Q${x} ${y} ${x + rr} ${y} L${x + w - rr} ${y} Q${x + w} ${y} ${x + w} ${y + rr} L${x + w} ${y + h} Z`;
-}
-
-function endRounded(x: number, y: number, w: number, h: number, r = 4): string {
-  const rr = Math.min(r, h / 2, w);
-  return `M${x} ${y} L${x + w - rr} ${y} Q${x + w} ${y} ${x + w} ${y + rr} L${x + w} ${y + h - rr} Q${x + w} ${y + h} ${x + w - rr} ${y + h} L${x} ${y + h} Z`;
 }
 
 const W = 720;
@@ -32,7 +41,9 @@ const monthDay = (iso: string) =>
  */
 export function ThroughputChart({ data }: { data: WeekPoint[] }) {
   const [hover, setHover] = useState<{ i: number; x: number; y: number; w: number } | null>(null);
-  const [asTable, setAsTable] = useState(false);
+  const narrow = useNarrow(600);
+  const [asTable, setAsTable] = useState(narrow);
+  useEffect(() => setAsTable(narrow), [narrow]);
 
   const max = niceMax(Math.max(1, ...data.flatMap((d) => [d.created, d.closed])));
   const plotW = W - PAD.left - PAD.right;
@@ -128,6 +139,17 @@ export function ThroughputChart({ data }: { data: WeekPoint[] }) {
                     width={band}
                     height={plotH}
                     fill="transparent"
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Week of ${monthDay(d.weekStart)}: ${d.created} opened, ${d.closed} closed`}
+                    onFocus={(e) => {
+                      const box = (
+                        e.currentTarget.ownerSVGElement!.parentElement as HTMLElement
+                      ).getBoundingClientRect();
+                      const x = ((PAD.left + i * band + band / 2) / W) * box.width;
+                      setHover({ i, x, y: box.height / 2, w: box.width });
+                    }}
+                    onBlur={() => setHover(null)}
                     onMouseMove={(e) => {
                       const box = (
                         e.currentTarget.ownerSVGElement!.parentElement as HTMLElement
@@ -183,6 +205,8 @@ interface BarListProps {
   /** Use each bucket's own option colour (Status, Team…) rather than one sequential hue. */
   useOptionColors?: boolean;
   empty?: string;
+  /** Given a bucket's filter value, opens the issues it counts. */
+  onPick?: (value: string) => void;
 }
 
 /** Horizontal bars with the value written at the end of every bar — no tooltip needed. */
@@ -191,6 +215,7 @@ export function BarList({
   buckets,
   useOptionColors,
   empty = 'Nothing to show',
+  onPick,
 }: BarListProps) {
   const max = Math.max(1, ...buckets.map((b) => b.count));
   const total = buckets.reduce((a, b) => a + b.count, 0);
@@ -206,26 +231,33 @@ export function BarList({
         </p>
       ) : (
         <div className="bar-list">
-          {buckets.map((b) => (
-            <div key={b.label} className="bar-row">
-              <span className="bar-label truncate" title={b.label}>
-                {b.label}
-              </span>
-              <svg
-                viewBox="0 0 200 14"
-                preserveAspectRatio="none"
-                className="bar-track"
-                role="img"
-                aria-label={`${b.label}: ${b.count}`}
+          {buckets.map((b) => {
+            const pick = onPick && b.value ? () => onPick(b.value!) : undefined;
+            const Row = pick ? 'button' : 'div';
+            return (
+              <Row
+                key={b.label}
+                className={`bar-row ${pick ? 'pickable' : ''}`}
+                {...(pick
+                  ? { onClick: pick, title: `Show the ${b.count} issues in ${b.label}` }
+                  : {})}
               >
-                <path
-                  d={b.count === 0 ? '' : endRounded(0, 1, Math.max(3, (b.count / max) * 200), 12)}
-                  fill={useOptionColors ? colorVar(b.color) : 'var(--chart-seq)'}
-                />
-              </svg>
-              <span className="bar-value">{b.count}</span>
-            </div>
-          ))}
+                <span className="bar-label truncate" title={b.label}>
+                  {b.label}
+                </span>
+                <span className="bar-track" aria-label={`${b.label}: ${b.count}`} role="img">
+                  <span
+                    className="bar-fill"
+                    style={{
+                      width: `${Math.max(2, (b.count / max) * 100)}%`,
+                      background: useOptionColors ? colorVar(b.color) : 'var(--chart-seq)',
+                    }}
+                  />
+                </span>
+                <span className="bar-value">{b.count}</span>
+              </Row>
+            );
+          })}
         </div>
       )}
     </figure>
@@ -237,17 +269,20 @@ export function StatTile({
   value,
   sub,
   tone,
+  onClick,
 }: {
   label: string;
   value: string | number;
   sub?: string;
   tone?: 'good' | 'bad';
+  onClick?: () => void;
 }) {
+  const Box = onClick ? 'button' : 'div';
   return (
-    <div className="stat">
+    <Box className={`stat ${onClick ? 'pickable' : ''}`} {...(onClick ? { onClick } : {})}>
       <span className="stat-label">{label}</span>
       <strong className={`stat-value ${tone ?? ''}`}>{value}</strong>
       {sub && <span className="faint">{sub}</span>}
-    </div>
+    </Box>
   );
 }

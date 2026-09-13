@@ -60,7 +60,7 @@
   --accent-fg: #ffffff;
   --danger: #ef6b6b;
   --success: #4cc27a;
-  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border);
+  --shadow-pop: 0 8px 24px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--border-strong);
 
   --chart-1: #5b93dd;
   --chart-2: #45a874;
