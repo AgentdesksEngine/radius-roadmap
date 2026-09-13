@@ -28,6 +28,16 @@ const schema = z.object({
   GITHUB_ISSUES_REPO: z.string().default('radius-roadmap'),
   DEV_GITHUB_TOKEN: z.string().optional(),
 
+  // --- Slack ingest (api/slack/[action].ts) ---
+  SLACK_SIGNING_SECRET: z.string().optional(),
+  SLACK_BOT_TOKEN: z.string().optional(),
+  /** The app's own user id, so it can ignore its own thread replies instead of looping. */
+  SLACK_BOT_USER_ID: z.string().optional(),
+  /** Reaction that captures a bug, without the colons. */
+  SLACK_TRIGGER_EMOJI: z.string().default('bug'),
+  /** Comma-separated channel-id allowlist. Empty means "any channel the app is in". */
+  SLACK_INGEST_CHANNELS: z.string().optional(),
+
   // --- Shared ---
   ISSUE_KEY_PREFIX: z.string().default('RAD'),
   APP_URL: z.string().optional(),
@@ -68,4 +78,27 @@ export function requireSupabaseEnv() {
     SUPABASE_ANON_KEY: string;
     SUPABASE_SERVICE_ROLE_KEY: string;
   };
+}
+
+/**
+ * The Slack route calls this before touching a request. Failing loudly here beats the
+ * alternative — an unconfigured signing secret would otherwise mean every request verifies
+ * against `undefined`, and the endpoint silently accepts nothing.
+ */
+export function requireSlackEnv() {
+  const e = env();
+  if (!e.SLACK_SIGNING_SECRET || !e.SLACK_BOT_TOKEN) {
+    throw new Error('SLACK_SIGNING_SECRET / SLACK_BOT_TOKEN are not set. See .env.example.');
+  }
+  return e as Env & { SLACK_SIGNING_SECRET: string; SLACK_BOT_TOKEN: string };
+}
+
+/** Channel allowlist, parsed. An empty set means "no restriction". */
+export function slackIngestChannels(): Set<string> {
+  return new Set(
+    (env().SLACK_INGEST_CHANNELS ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+  );
 }

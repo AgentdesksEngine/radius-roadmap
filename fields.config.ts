@@ -110,6 +110,7 @@ export const fields: FieldSpec[] = [
     options: [
       { name: 'QA', color: 'BLUE' },
       { name: 'Agent', color: 'GREEN', description: 'Reported by a customer / agent' },
+      { name: 'Slack', color: 'PURPLE', description: 'Captured from a Slack thread' },
       { name: 'Internal', color: 'GRAY' },
     ],
   },
