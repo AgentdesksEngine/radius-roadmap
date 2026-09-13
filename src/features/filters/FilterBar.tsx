@@ -79,7 +79,9 @@ export function FilterBar() {
     chips.push({
       key: ASSIGNEE,
       label: 'Assignee',
-      values: filters.assignees.map((a) => (a === '__none' ? 'none' : a)),
+      values: filters.assignees.map((a) =>
+        a === '__none' ? 'none' : (assigneeItems.find((i) => i.id === a)?.label ?? '…'),
+      ),
       items: assigneeItems,
       onToggle: (id) => setFilters((p) => ({ ...p, assignees: toggle(p.assignees, id) })),
       onRemove: () => setFilters((p) => ({ ...p, assignees: [] })),
