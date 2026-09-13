@@ -15,7 +15,7 @@
  * which lands the issue in the Intake view, which is exactly the queue a human should see.
  */
 import type { ProjectSchema } from '../../../shared/types.js';
-import { db, withActor } from '../db/pool.js';
+import { asJson, db, withActor } from '../db/pool.js';
 import { getItem, getSchema } from '../db/board.js';
 import type { BoardItem } from '../../../shared/types.js';
 import type { SlackMessage, SlackUser } from './client.js';
@@ -364,7 +364,7 @@ export async function ingestSlackMessage(args: {
   const issueId = await withActor(authorId, async (tx) => {
     const rows = await tx<{ id: string }[]>`
       insert into issues (title, body, author_id, fields, slack_channel_id, slack_message_ts)
-      values (${draft.title}, ${draft.body}, ${authorId}, ${JSON.stringify(fieldsJson)}::jsonb, ${args.channelId}, ${args.parent.ts})
+      values (${draft.title}, ${draft.body}, ${authorId}, ${tx.json(asJson(fieldsJson))}::jsonb, ${args.channelId}, ${args.parent.ts})
       on conflict (slack_channel_id, slack_message_ts) where slack_channel_id is not null and slack_message_ts is not null
       do nothing
       returning id

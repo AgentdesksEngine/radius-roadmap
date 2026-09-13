@@ -35,7 +35,7 @@ import type {
 } from '../../../shared/types.js';
 import { env } from '../env.js';
 import { HttpError } from '../http.js';
-import { db, withActor } from './pool.js';
+import { asJson, db, withActor } from './pool.js';
 
 // ---------- Schema ----------
 
@@ -358,8 +358,8 @@ export async function setItemField(
     if (args.value === null) {
       await tx`update issues set fields = fields - ${args.fieldId} where id = ${args.itemId}`;
     } else {
-      const json = JSON.stringify(fieldValueToJsonb(args.value));
-      await tx`update issues set fields = jsonb_set(fields, array[${args.fieldId}], ${json}::jsonb) where id = ${args.itemId}`;
+      const json = fieldValueToJsonb(args.value);
+      await tx`update issues set fields = jsonb_set(fields, array[${args.fieldId}], ${tx.json(asJson(json))}::jsonb) where id = ${args.itemId}`;
     }
   });
 }
@@ -439,7 +439,7 @@ export async function createIssue(profileId: string, req: CreateIssueRequest): P
   const newIssueId = await withActor(profileId, async (tx) => {
     const [issue] = await tx<{ id: string }[]>`
       insert into issues (title, body, author_id, fields)
-      values (${req.title}, ${req.body ?? ''}, ${profileId}, ${JSON.stringify(fieldsJson)}::jsonb)
+      values (${req.title}, ${req.body ?? ''}, ${profileId}, ${tx.json(asJson(fieldsJson))}::jsonb)
       returning id
     `;
     for (const labelId of labelIds) {

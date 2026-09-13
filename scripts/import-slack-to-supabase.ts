@@ -17,7 +17,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { TransactionSql } from 'postgres';
-import { db } from '../api/_lib/db/pool';
+import { asJson, db } from '../api/_lib/db/pool';
 import { moduleMap, statusMap } from '../import.config';
 import { seedFieldSchema, type FieldMaps } from './_field-schema';
 
@@ -329,7 +329,7 @@ async function importRow(m: Mapped, maps: FieldMaps, position: number): Promise<
       insert into issues (title, body, state, state_reason, author_id, created_at, updated_at, closed_at, position, fields)
       values (
         ${m.title}, ${m.body}, ${state}, ${stateReason}, ${authorId},
-        ${createdAt}, ${createdAt}, ${closedAt}, ${position}, ${JSON.stringify(fields)}::jsonb
+        ${createdAt}, ${createdAt}, ${closedAt}, ${position}, ${tx.json(asJson(fields))}::jsonb
       )
       returning id
     `;
