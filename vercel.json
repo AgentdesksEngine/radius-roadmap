@@ -6,6 +6,6 @@
       "source": "/api/issues/:id/:sub",
       "destination": "/api/issues/:id?sub=:sub"
     },
-    { "source": "/((?!api/).*)", "destination": "/index.html" }
+    { "source": "/((?!api/|assets/).*)", "destination": "/index.html" }
   ]
 }
