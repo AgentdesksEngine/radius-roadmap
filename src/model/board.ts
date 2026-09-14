@@ -356,6 +356,48 @@ export function sortItems(
   return [...items].sort((a, b) => cmp(a, b) * m);
 }
 
+/**
+ * Sort key for an arbitrary field, so a spreadsheet column of any data type can be
+ * ordered. Select fields sort by the option order the project defines rather than
+ * alphabetically — "Urgent" before "Low", not after it. Empty always sorts last.
+ */
+export function fieldSortValue(
+  schema: ProjectSchema,
+  item: BoardItem,
+  fieldName: string,
+): string | number {
+  const f = field(schema, fieldName);
+  const v = item.fields[fieldName];
+  const emptyRank = f?.options ? Number.MAX_SAFE_INTEGER : '\uffff';
+  if (!v) return emptyRank;
+  switch (v.kind) {
+    case 'singleSelect':
+      return optionRank(schema, fieldName, item);
+    case 'multiSelect':
+      return v.options.length
+        ? v.options
+            .map((o) => o.name)
+            .join(', ')
+            .toLowerCase()
+        : '\uffff';
+    case 'text':
+      return v.text ? v.text.toLowerCase() : '\uffff';
+    case 'number':
+      return v.number;
+    case 'date':
+      return v.date;
+    case 'iteration':
+      return v.startDate;
+    default:
+      return emptyRank;
+  }
+}
+
+export function compareValues(a: string | number, b: string | number): number {
+  if (typeof a === 'number' && typeof b === 'number') return a - b;
+  return String(a).localeCompare(String(b));
+}
+
 export function teamCounts(items: BoardItem[]): Map<string, number> {
   const m = new Map<string, number>();
   for (const it of items) {

@@ -11,7 +11,9 @@
   color: var(--text);
   font-weight: 500;
   white-space: nowrap;
-  transition: background 0.12s, border-color 0.12s;
+  transition:
+    background 0.12s,
+    border-color 0.12s;
 }
 .btn:hover:not(:disabled) {
   background: var(--bg-hover);
@@ -58,7 +60,9 @@
   height: 26px;
   border-radius: var(--radius);
   color: var(--text-2);
-  transition: background 0.12s, color 0.12s;
+  transition:
+    background 0.12s,
+    color 0.12s;
 }
 .icon-btn:hover {
   background: var(--bg-hover);
@@ -519,19 +523,6 @@
   color: var(--text-3);
 }
 
-/* @mention popup, anchored over a textarea */
-.mention-pop {
-  position: absolute;
-  z-index: 70;
-  min-width: 220px;
-  max-height: 210px;
-  overflow-y: auto;
-  background: var(--bg);
-  border-radius: 8px;
-  box-shadow: var(--shadow-pop);
-  padding: 4px;
-}
-.mention-pop .menu-item[aria-selected='true'] { background: var(--bg-hover); }
 
 /* A field that just saved */
 .saved-flag {
@@ -539,4 +530,40 @@
   color: var(--success);
   margin-left: 6px;
   animation: fade-in 0.12s;
+}
+
+/* Restored draft banner */
+.draft-restored {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-2);
+  background: var(--bg-subtle);
+  border-radius: var(--radius);
+  padding: 6px 10px;
+  margin-bottom: 10px;
+}
+.link-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.link-btn:hover {
+  color: var(--danger);
+}
+.create-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.create-more input {
+  margin: 0;
+  cursor: pointer;
 }

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { FieldWriteValue, ProjectField } from '@shared/types';
 import { useCreateIssue, useSchema } from '@/api/hooks';
+import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
 import { STATUS, TEAM, field, selectWrite } from '@/model/board';
 import { useUi } from '../shell/state';
@@ -69,6 +70,7 @@ export function QuickAdd({ groupField, optionId, onClose }: Props) {
         placeholder="Issue title…"
         disabled={create.isPending}
         onChange={(e) => setTitle(e.target.value)}
+        // Only an untouched box closes itself — typed text is never thrown away on blur.
         onBlur={() => !title.trim() && onClose()}
         onKeyDown={(e) => {
           if (e.key === 'Enter' && !e.shiftKey) {
@@ -81,7 +83,20 @@ export function QuickAdd({ groupField, optionId, onClose }: Props) {
           }
         }}
       />
-      <span className="faint">↵ to create · ⌘↵ to create and keep going · Esc to cancel</span>
+      <div className="quick-add-actions">
+        <span className="faint">↵ create · ⌘↵ keep going · Esc cancel</span>
+        <Button size="sm" variant="ghost" onClick={onClose} disabled={create.isPending}>
+          Cancel
+        </Button>
+        <Button
+          size="sm"
+          variant="primary"
+          disabled={!title.trim() || create.isPending}
+          onClick={() => submit(false)}
+        >
+          {create.isPending ? 'Creating…' : 'Create'}
+        </Button>
+      </div>
     </div>
   );
 }

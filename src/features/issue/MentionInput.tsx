@@ -1,4 +1,12 @@
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ClipboardEvent,
+  type DragEvent,
+  type KeyboardEvent,
+  type RefObject,
+} from 'react';
 import { useMembers } from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { activeMention, applyMention, type MentionQuery } from './mentions';
@@ -14,14 +22,34 @@ export function MentionInput({
   onChange,
   onSubmit,
   placeholder,
+  /** Lets a wrapper (the Composer) reach the caret to insert text of its own. */
+  inputRef,
+  minHeight,
+  autoFocus,
+  id,
+  onPaste,
+  onDrop,
+  onDragOver,
+  onDragLeave,
+  className = '',
 }: {
   value: string;
   onChange: (v: string) => void;
   onSubmit: () => void;
   placeholder?: string;
+  inputRef?: RefObject<HTMLTextAreaElement | null>;
+  minHeight?: number;
+  autoFocus?: boolean;
+  id?: string;
+  onPaste?: (e: ClipboardEvent<HTMLTextAreaElement>) => void;
+  onDrop?: (e: DragEvent<HTMLTextAreaElement>) => void;
+  onDragOver?: (e: DragEvent<HTMLTextAreaElement>) => void;
+  onDragLeave?: (e: DragEvent<HTMLTextAreaElement>) => void;
+  className?: string;
 }) {
   const { data: members } = useMembers();
-  const ref = useRef<HTMLTextAreaElement>(null);
+  const innerRef = useRef<HTMLTextAreaElement>(null);
+  const ref = inputRef ?? innerRef;
   const [query, setQuery] = useState<MentionQuery | null>(null);
   const [active, setActive] = useState(0);
   /** Set after an insert so the caret can be restored once React has re-rendered the value. */
@@ -84,8 +112,15 @@ export function MentionInput({
     <div className="mention-wrap">
       <textarea
         ref={ref}
-        className="textarea"
+        id={id}
+        autoFocus={autoFocus}
+        style={minHeight ? { minHeight } : undefined}
+        className={`textarea ${className}`.trim()}
         placeholder={placeholder}
+        onPaste={onPaste}
+        onDrop={onDrop}
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
         value={value}
         onChange={(e) => {
           onChange(e.target.value);
