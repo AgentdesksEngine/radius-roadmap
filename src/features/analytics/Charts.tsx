@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Avatar } from '@/components/ui/Avatar';
 import { colorVar } from '@/model/board';
-import type { Bucket, WeekPoint } from '@/model/analytics';
+import { UNASSIGNED_ID, type Bucket, type PersonCompleted, type WeekPoint } from '@/model/analytics';
 
 /** True while the viewport is narrower than `px`. */
 function useNarrow(px = 600): boolean {
@@ -284,5 +285,80 @@ export function StatTile({
       <strong className={`stat-value ${tone ?? ''}`}>{value}</strong>
       {sub && <span className="faint">{sub}</span>}
     </Box>
+  );
+}
+
+interface CompletedTableProps {
+  rows: PersonCompleted[];
+  /** Heading for the recent column, so it tracks the page's range selector. */
+  windowLabel?: string;
+  title?: string;
+  empty?: string;
+  /** Drills into the board filtered to that person, like the bar lists do. */
+  onPick?: (profileId: string) => void;
+}
+
+/**
+ * Who closed what. A table rather than bars: two numbers per row read better side by side
+ * than as two bar charts, and the list is as long as the team is.
+ */
+export function CompletedTable({
+  rows,
+  windowLabel = '30 days',
+  title = 'Completed per person',
+  empty = 'Nothing has been completed yet',
+  onPick,
+}: CompletedTableProps) {
+  const total = rows.reduce((a, r) => a + r.total, 0);
+  return (
+    <figure className="chart">
+      <figcaption>
+        <span>{title}</span>
+        <span className="faint">{total}</span>
+      </figcaption>
+      {rows.length === 0 ? (
+        <p className="faint" style={{ margin: '8px 0 0' }}>
+          {empty}
+        </p>
+      ) : (
+        <div className="chart-table-wrap">
+          <table className="chart-table people-table">
+            <thead>
+              <tr>
+                <th>Person</th>
+                <th className="num">Last {windowLabel}</th>
+                <th className="num">All time</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.person.id}>
+                  <td>
+                    {/* Unassigned is not a person, so there is nothing to filter the board by. */}
+                    {onPick && r.person.id !== UNASSIGNED_ID ? (
+                      <button className="people-cell pickable" onClick={() => onPick(r.person.id)}>
+                        <Avatar person={r.person} size={18} />
+                        <span className="truncate">{r.person.name ?? 'Unknown'}</span>
+                      </button>
+                    ) : (
+                      <span className="people-cell">
+                        {r.person.id === UNASSIGNED_ID ? (
+                          <span className="people-none" aria-hidden />
+                        ) : (
+                          <Avatar person={r.person} size={18} />
+                        )}
+                        <span className="truncate">{r.person.name ?? 'Unknown'}</span>
+                      </span>
+                    )}
+                  </td>
+                  <td className="num">{r.recent || ''}</td>
+                  <td className="num">{r.total}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </figure>
   );
 }

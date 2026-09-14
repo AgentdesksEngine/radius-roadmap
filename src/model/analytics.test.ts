@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import type { BoardItem, ProjectField } from '@shared/types';
-import { ageBuckets, cycleTime, openByField, summarize, throughput, weekStart } from './analytics';
+import {
+  UNASSIGNED_ID,
+  ageBuckets,
+  completedByPerson,
+  cycleTime,
+  openByField,
+  summarize,
+  throughput,
+  weekStart,
+} from './analytics';
 
 const NOW = Date.parse('2026-09-07T12:00:00Z'); // a Monday
 const DAY = 24 * 3600_000;
@@ -172,5 +181,66 @@ describe('openByField with a multi-valued field', () => {
   it('still reports issues with no team at all', () => {
     const buckets = openByField([item({ number: 3 })], TEAM_FIELD);
     expect(buckets.find((b) => b.label === 'No team')?.count).toBe(1);
+  });
+});
+
+describe('completedByPerson', () => {
+  const NOW = Date.parse('2026-09-14T12:00:00Z');
+  const ana = { id: 'p-ana', name: 'Ana', avatarUrl: null };
+  const bo = { id: 'p-bo', name: 'Bo', avatarUrl: null };
+
+  const done = (number: number, assignees: typeof ana[], closedDaysAgo: number): BoardItem =>
+    item({
+      number,
+      state: 'CLOSED',
+      stateReason: 'COMPLETED',
+      closedAt: new Date(NOW - closedDaysAgo * 24 * 3600_000).toISOString(),
+      assignees,
+    });
+
+  it('counts completed issues per assignee, recent and all time', () => {
+    const rows = completedByPerson([done(1, [ana], 2), done(2, [ana], 200), done(3, [bo], 5)], 30, NOW);
+    expect(rows.map((r) => [r.person.name, r.recent, r.total])).toEqual([
+      ['Ana', 1, 2],
+      ['Bo', 1, 1],
+    ]);
+  });
+
+  it('credits every assignee of a shared issue', () => {
+    const rows = completedByPerson([done(1, [ana, bo], 1)], 30, NOW);
+    expect(rows.every((r) => r.recent === 1 && r.total === 1)).toBe(true);
+    expect(rows).toHaveLength(2);
+  });
+
+  it('ignores work that was closed but not completed', () => {
+    const canceled = item({
+      number: 9,
+      state: 'CLOSED',
+      stateReason: 'NOT_PLANNED',
+      closedAt: new Date(NOW).toISOString(),
+      assignees: [ana],
+    });
+    expect(completedByPerson([canceled], 30, NOW)).toEqual([]);
+  });
+
+  it('ignores issues that are still open', () => {
+    expect(completedByPerson([item({ number: 10, assignees: [ana] })], 30, NOW)).toEqual([]);
+  });
+
+  it('keeps unassigned completed work visible rather than dropping it', () => {
+    const rows = completedByPerson([done(1, [], 1)], 30, NOW);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.person.id).toBe(UNASSIGNED_ID);
+    expect(rows[0]!.total).toBe(1);
+  });
+
+  it('ranks by recent work first, then by all-time', () => {
+    const rows = completedByPerson(
+      [done(1, [ana], 500), done(2, [ana], 400), done(3, [ana], 300), done(4, [bo], 1)],
+      30,
+      NOW,
+    );
+    expect(rows[0]!.person.name).toBe('Bo');
+    expect(rows[1]!.person.name).toBe('Ana');
   });
 });

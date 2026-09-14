@@ -1,6 +1,16 @@
 import type { BoardItem, ProjectSchema, Widget, WidgetMeasure, WidgetStat } from '@shared/types';
 import { field } from '@/model/board';
-import { ageBuckets, cycleTime, openByField, summarize, throughput, type Bucket, type WeekPoint } from '@/model/analytics';
+import {
+  ageBuckets,
+  completedByPerson,
+  cycleTime,
+  openByField,
+  summarize,
+  throughput,
+  type Bucket,
+  type PersonCompleted,
+  type WeekPoint,
+} from '@/model/analytics';
 
 /**
  * A dashboard widget is a *name of a measure*, not a query. Everything below runs over the
@@ -23,6 +33,7 @@ export const MEASURE_LABELS: Record<WidgetMeasure, string> = {
   throughput: 'Opened vs closed, by week',
   age: 'How long open issues have been open',
   cycleTime: 'Median time to close',
+  completedByPerson: 'Completed issues per person',
 };
 
 /** Fields worth grouping by — the select fields, which are the ones with a fixed option list. */
@@ -43,18 +54,24 @@ export function widgetTitle(w: Widget): string {
       return 'Age of open issues';
     case 'cycleTime':
       return 'Median time to close';
+    case 'completedByPerson':
+      return 'Completed per person';
   }
 }
 
 export type WidgetData =
   | { kind: 'stat'; label: string; value: string | number; sub?: string; tone?: 'good' | 'bad' }
   | { kind: 'bars'; title: string; buckets: Bucket[]; useOptionColors: boolean; empty?: string }
-  | { kind: 'throughput'; data: WeekPoint[] };
+  | { kind: 'throughput'; data: WeekPoint[] }
+  | { kind: 'people'; title: string; rows: PersonCompleted[] };
 
 export function widgetData(w: Widget, items: BoardItem[], schema: ProjectSchema | undefined): WidgetData {
   switch (w.measure) {
     case 'throughput':
       return { kind: 'throughput', data: throughput(items) };
+
+    case 'completedByPerson':
+      return { kind: 'people', title: widgetTitle(w), rows: completedByPerson(items) };
 
     case 'age':
       return {

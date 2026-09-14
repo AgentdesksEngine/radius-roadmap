@@ -276,3 +276,38 @@
     transition: none;
   }
 }
+
+/* Completed-per-person table. Numbers right-aligned so the columns can be compared by eye. */
+.people-table th.num,
+.people-table td.num {
+  text-align: right;
+  width: 84px;
+}
+.people-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+/* Keeps the Unassigned row's name aligned with everyone else's. */
+.people-none {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px dashed var(--border-strong);
+  flex: none;
+}
+.people-cell.pickable {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--radius-sm);
+  max-width: 100%;
+}
+.people-cell.pickable:hover {
+  background: var(--bg-subtle);
+}

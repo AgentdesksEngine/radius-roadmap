@@ -21,7 +21,7 @@ import { requireUser } from '../_lib/session.js';
 
 const WidgetSchema = z.object({
   id: z.string().min(1),
-  measure: z.enum(['stat', 'openByField', 'throughput', 'age', 'cycleTime']),
+  measure: z.enum(['stat', 'openByField', 'throughput', 'age', 'cycleTime', 'completedByPerson']),
   title: z.string().max(120).optional(),
   stat: z.enum(['open', 'createdRecently', 'closedRecently', 'needsTriage', 'urgentOpen', 'net']).optional(),
   groupBy: z.string().max(120).optional(),

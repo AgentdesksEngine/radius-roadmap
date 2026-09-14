@@ -1,4 +1,4 @@
-import type { BoardItem, OptionColor, ProjectField } from '@shared/types';
+import type { BoardItem, OptionColor, Person, ProjectField } from '@shared/types';
 import { PRIORITY, needsTriage, selectName, selectNames } from './board';
 
 const DAY = 24 * 3600_000;
@@ -158,4 +158,56 @@ export function summarize(items: BoardItem[], windowDays = 30, now = Date.now())
     urgentOpen,
     net: createdRecently - closedRecently,
   };
+}
+
+/** Stand-in id for completed work nobody was assigned to, so the rows still add up. */
+export const UNASSIGNED_ID = '__unassigned';
+
+export interface PersonCompleted {
+  person: Person;
+  /** Closed inside the window. */
+  recent: number;
+  /** Closed ever. */
+  total: number;
+}
+
+/**
+ * Completed issues credited to each assignee. "Completed" is CLOSED with reason COMPLETED —
+ * Canceled and Can't reproduce are closed too, and counting those as someone's output would
+ * be actively misleading.
+ *
+ * An issue with two assignees counts for both, so the column total can exceed the issue
+ * count. That is the honest reading of a shared assignment: neither person did half of it.
+ */
+export function completedByPerson(
+  items: BoardItem[],
+  windowDays = 30,
+  now = Date.now(),
+): PersonCompleted[] {
+  const cutoff = now - windowDays * DAY;
+  const rows = new Map<string, PersonCompleted>();
+
+  const credit = (person: Person, recent: boolean) => {
+    const row = rows.get(person.id) ?? { person, recent: 0, total: 0 };
+    row.total += 1;
+    if (recent) row.recent += 1;
+    rows.set(person.id, row);
+  };
+
+  for (const it of items) {
+    if (it.state !== 'CLOSED' || it.stateReason !== 'COMPLETED') continue;
+    const recent = Boolean(it.closedAt) && Date.parse(it.closedAt!) >= cutoff;
+    if (it.assignees.length === 0) {
+      credit({ id: UNASSIGNED_ID, name: 'Unassigned', avatarUrl: null }, recent);
+    } else {
+      for (const a of it.assignees) credit(a, recent);
+    }
+  }
+
+  return [...rows.values()].sort(
+    (a, b) =>
+      b.recent - a.recent ||
+      b.total - a.total ||
+      (a.person.name ?? '').localeCompare(b.person.name ?? ''),
+  );
 }

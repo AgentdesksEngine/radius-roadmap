@@ -6,12 +6,19 @@ import { useBoard, useDashboards, useSchema } from '@/api/hooks';
 import { Button } from '@/components/ui/Button';
 import { Picker } from '@/components/ui/Picker';
 import { MODULE, PRIORITY, STATUS, TEAM, WORK_TYPE, field, filterItems } from '@/model/board';
-import { ageBuckets, cycleTime, openByField, summarize, throughput } from '@/model/analytics';
+import {
+  ageBuckets,
+  completedByPerson,
+  cycleTime,
+  openByField,
+  summarize,
+  throughput,
+} from '@/model/analytics';
 import { usePref } from '@/model/prefs';
 import { encodeFilters } from '@/model/views';
 import { ViewHeader } from '../shell/ViewHeader';
 import { useUi } from '../shell/state';
-import { BarList, StatTile, ThroughputChart } from './Charts';
+import { BarList, CompletedTable, StatTile, ThroughputChart } from './Charts';
 import { AddWidget, DashboardPicker, DEFAULT_DASHBOARD_ID, RemoveWidget } from './Dashboards';
 import { widgetData, widgetTitle } from './widgets';
 import './analytics.css';
@@ -53,6 +60,7 @@ export function AnalyticsView() {
   const weeks = useMemo(() => throughput(items, range.weeks), [items, range.weeks]);
   const cycle = useMemo(() => cycleTime(items, range.days), [items, range.days]);
   const ages = useMemo(() => ageBuckets(items), [items]);
+  const completed = useMemo(() => completedByPerson(items, range.days), [items, range.days]);
 
   const scope = filters.team ? `${filters.team} · ` : '';
 
@@ -193,6 +201,11 @@ export function AnalyticsView() {
               buckets={ages}
               empty="No open issues"
             />
+            <CompletedTable
+              rows={completed}
+              windowLabel={range.label}
+              onPick={(id) => go('/list', { assignees: [id] })}
+            />
           </div>
         </div>
       )}
@@ -251,6 +264,8 @@ function CustomDashboard({
               <RemoveWidget dashboard={dashboard} widgetId={w.id} />
               {data.kind === 'throughput' ? (
                 <ThroughputChart data={data.data} />
+              ) : data.kind === 'people' ? (
+                <CompletedTable rows={data.rows} title={data.title} />
               ) : data.kind === 'bars' ? (
                 <BarList
                   title={data.title}
