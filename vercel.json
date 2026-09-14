@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
-  "rewrites": [{ "source": "/((?!api/).*)", "destination": "/index.html" }]
+  "rewrites": [
+    {
+      "source": "/api/issues/:id/:sub",
+      "destination": "/api/issues/:id?sub=:sub"
+    },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
 }
