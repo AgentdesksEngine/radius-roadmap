@@ -119,6 +119,21 @@ describe('widgetData', () => {
     expect(data).toMatchObject({ kind: 'stat', value: '—' });
   });
 
+  it('turns completed-per-person into table rows', () => {
+    const closed = item({
+      number: 9,
+      state: 'CLOSED',
+      stateReason: 'COMPLETED',
+      closedAt: new Date().toISOString(),
+      assignees: [{ id: 'p1', name: 'Ana', avatarUrl: null }],
+    });
+    const data = widgetData(w({ measure: 'completedByPerson' }), [...ITEMS, closed], SCHEMA);
+    expect(data.kind).toBe('people');
+    if (data.kind !== 'people') return;
+    expect(data.title).toBe('Completed per person');
+    expect(data.rows.map((r) => [r.person.name, r.total])).toEqual([['Ana', 1]]);
+  });
+
   it('round-trips through the JSON that gets stored on the dashboard', () => {
     const widget = w({ measure: 'openByField', groupBy: 'Status' });
     const restored = JSON.parse(JSON.stringify([widget]))[0] as Widget;
