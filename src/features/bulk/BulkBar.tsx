@@ -1,7 +1,9 @@
-import { Archive, ArchiveRestore, X } from 'lucide-react';
-import type { ProjectField } from '@shared/types';
-import { useArchiveItem, useBulkField, useSchema } from '@/api/hooks';
+import { useState } from 'react';
+import { Archive, ArchiveRestore, ListChecks, X } from 'lucide-react';
+import type { BoardItem, FieldValue, FieldWriteValue, ProjectField } from '@shared/types';
+import { useArchiveItem, useBoard, useBulkField, useSchema } from '@/api/hooks';
 import { Button, IconButton } from '@/components/ui/Button';
+import { Confirm } from '@/components/ui/Confirm';
 import { Picker } from '@/components/ui/Picker';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
@@ -11,55 +13,115 @@ import { useUi } from '../shell/state';
 import './bulk.css';
 
 const BULK_FIELDS = [STATUS, TEAM, PRIORITY, WORK_TYPE];
+/** Above this many items an archive asks first; below it, the Undo toast is enough. */
+const CONFIRM_OVER = 20;
 
 /**
  * Floating action bar for a multi-item selection. Writes go through one bulk request so a
  * 40-issue triage sweep is one round trip, and partial failures are reported rather than
  * rolled back — the issues that did move should stay moved.
+ *
+ * Every write hands back an Undo, restoring each item's own previous value rather than a
+ * single shared one, since a selection rarely started out uniform.
  */
 export function BulkBar() {
   const { data: schema } = useSchema();
-  const { selection, setSelection, filters } = useUi();
+  const { data: board } = useBoard();
+  const { selection, setSelection, visibleIds } = useUi();
   const bulk = useBulkField();
   const archive = useArchiveItem();
   const toast = useToast();
+  const [confirmArchive, setConfirmArchive] = useState(false);
 
   if (!schema || selection.length === 0) return null;
 
-  const report = (verb: string, failed: { itemId: string }[]) => {
-    if (failed.length)
+  const items = (board?.items ?? []).filter((i) => selection.includes(i.itemId));
+  const unselected = visibleIds.filter((id) => !selection.includes(id));
+
+  const report = (verb: string, failed: { itemId: string }[], undo?: () => void) => {
+    if (failed.length) {
       toast.error(`${verb} ${selection.length - failed.length}, ${failed.length} failed`);
-    else toast.success(`${verb} ${selection.length} issue${selection.length === 1 ? '' : 's'}`);
+    } else {
+      toast.success(`${verb} ${selection.length} issue${selection.length === 1 ? '' : 's'}`, {
+        action: undo ? { label: 'Undo', undo: true, onClick: undo } : undefined,
+      });
+    }
     setSelection([]);
   };
 
-  const apply = (f: ProjectField, optionId: string, label: string) =>
+  /** The value an item held before the sweep, in the shape the field actually takes. */
+  const previousWrite = (f: ProjectField, v: FieldValue | undefined): FieldWriteValue => {
+    if (v?.kind === 'singleSelect') return selectWrite(f, [v.optionId]);
+    if (v?.kind === 'multiSelect') return selectWrite(f, v.options.map((o) => o.id));
+    return null;
+  };
+
+  /** Puts every item back to what it held, one call per distinct previous value. */
+  const undoFor = (f: ProjectField, before: BoardItem[]) => () => {
+    const groups = new Map<string, string[]>();
+    for (const i of before) {
+      const v = i.fields[f.name];
+      const key =
+        v?.kind === 'singleSelect'
+          ? v.optionId
+          : v?.kind === 'multiSelect'
+            ? v.options.map((o) => o.id).sort().join(',')
+            : '__none';
+      groups.set(key, [...(groups.get(key) ?? []), i.itemId]);
+    }
+    for (const [, itemIds] of groups) {
+      const sample = before.find((i) => i.itemId === itemIds[0]);
+      bulk.mutate(
+        { itemIds, fieldId: f.id, value: previousWrite(f, sample?.fields[f.name]) },
+        { onError: (e) => toast.error(`Couldn’t undo: ${e.message}`) },
+      );
+    }
+  };
+
+  const apply = (f: ProjectField, optionId: string) => {
+    const before = items.map((i) => ({ ...i, fields: { ...i.fields } }));
     bulk.mutate(
       { itemIds: selection, fieldId: f.id, value: selectWrite(f, [optionId]) },
       {
-        onSuccess: (r) => report(`Set ${label} on`, r.failed),
+        onSuccess: (r) => report(`Set ${f.name.toLowerCase()} on`, r.failed, undoFor(f, before)),
         onError: (e) => toast.error(`Bulk update failed: ${e.message}`),
       },
     );
-
-  const archiveAll = async () => {
-    const target = !filters.archived;
-    const results = await Promise.allSettled(
-      selection.map((itemId) => archive.mutateAsync({ itemId, archived: target })),
-    );
-    report(
-      target ? 'Archived' : 'Restored',
-      results.filter((r) => r.status === 'rejected').map(() => ({ itemId: '' })),
-    );
   };
 
-  const fields = BULK_FIELDS.map((n) => field(schema, n)).filter((f): f is NonNullable<typeof f> =>
+  // BULK-02: what the button does follows the selection, not whatever the filter happens to be.
+  const archivedCount = items.filter((i) => i.isArchived).length;
+  const restoring = archivedCount > items.length / 2;
+  const target = !restoring;
+
+  const runArchive = async () => {
+    const ids = items.filter((i) => i.isArchived !== target).map((i) => i.itemId);
+    const results = await Promise.allSettled(
+      ids.map((itemId) => archive.mutateAsync({ itemId, archived: target })),
+    );
+    const failed = results.filter((r) => r.status === 'rejected').map(() => ({ itemId: '' }));
+    report(target ? 'Archived' : 'Restored', failed, () => {
+      for (const itemId of ids) archive.mutate({ itemId, archived: !target });
+    });
+  };
+
+  const fields = BULK_FIELDS.map((n) => field(schema, n)).filter((f): f is ProjectField =>
     Boolean(f?.options),
   );
 
   return (
     <div className="bulk-bar" role="region" aria-label="Bulk actions">
       <strong>{selection.length} selected</strong>
+      {unselected.length > 0 && (
+        <Button
+          size="sm"
+          variant="ghost"
+          icon={<ListChecks />}
+          onClick={() => setSelection((prev) => [...new Set([...prev, ...visibleIds])])}
+        >
+          Select all {visibleIds.length}
+        </Button>
+      )}
       {fields.map((f) => {
         const isPrio = f.name === PRIORITY;
         return (
@@ -72,7 +134,7 @@ export function BulkBar() {
               icon: isPrio ? <PriorityIcon name={o.name} /> : undefined,
             }))}
             value={null}
-            onSelect={(id) => apply(f, id, f.name.toLowerCase())}
+            onSelect={(id) => apply(f, id)}
             placeholder={`Set ${f.name.toLowerCase()}…`}
           >
             <Button
@@ -89,16 +151,31 @@ export function BulkBar() {
       <Button
         size="sm"
         variant="ghost"
-        icon={filters.archived ? <ArchiveRestore /> : <Archive />}
+        icon={restoring ? <ArchiveRestore /> : <Archive />}
         disabled={archive.isPending}
-        onClick={archiveAll}
+        onClick={() =>
+          selection.length > CONFIRM_OVER ? setConfirmArchive(true) : void runArchive()
+        }
       >
-        {filters.archived ? 'Restore' : 'Archive'}
+        {restoring ? 'Restore' : 'Archive'}
       </Button>
       {bulk.isPending && <span className="spinner" />}
       <IconButton label="Clear selection" shortcut="Esc" size="sm" onClick={() => setSelection([])}>
         <X />
       </IconButton>
+
+      <Confirm
+        open={confirmArchive}
+        onOpenChange={setConfirmArchive}
+        title={restoring ? 'Restore these issues?' : 'Archive these issues?'}
+        body={
+          restoring
+            ? `${selection.length} issues will come back onto the board.`
+            : `${selection.length} issues will come off the board. You can undo this, or restore them from the Archived view.`
+        }
+        confirmLabel={restoring ? `Restore ${selection.length}` : `Archive ${selection.length}`}
+        onConfirm={() => void runArchive()}
+      />
     </div>
   );
 }

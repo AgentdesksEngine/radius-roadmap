@@ -21,16 +21,27 @@ table.list {
   padding: 0 8px;
   border-bottom: 1px solid var(--border);
   white-space: nowrap;
-  cursor: pointer;
   user-select: none;
   z-index: 1;
 }
-.list th:hover {
+.list .th-sort {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  height: 22px;
+  margin: 0 -5px;
+  padding: 0 5px;
+  border-radius: var(--radius-sm);
+  color: inherit;
+  font: inherit;
+}
+.list .th-sort:hover {
+  background: var(--bg-hover);
   color: var(--text);
 }
-.list th .arrow {
-  margin-left: 4px;
-  font-size: 10px;
+.list th[aria-sort='ascending'],
+.list th[aria-sort='descending'] {
+  color: var(--text);
 }
 .list td {
   height: 32px;
@@ -41,13 +52,28 @@ table.list {
   text-overflow: ellipsis;
 }
 .list tbody tr {
-  cursor: default;
+  cursor: pointer;
+  outline: none;
 }
 .list tbody tr:hover td {
   background: var(--bg-subtle);
 }
-.list tbody tr.focused td {
+/* Where the keyboard is: a rail on the left edge, so it reads differently from hover. */
+.list tbody tr.cursor td {
   background: var(--bg-hover);
+}
+.list tbody tr.cursor td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.list tbody tr:focus-visible td {
+  background: var(--bg-hover);
+}
+.list tbody tr:focus-visible td:first-child {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+/* Which issue the drawer is showing. */
+.list tbody tr.open td {
+  background: var(--accent-soft);
 }
 .list tr.closed .title {
   color: var(--text-2);
@@ -96,4 +122,67 @@ table.list {
 .list td input[type='checkbox'] {
   cursor: pointer;
   margin: 0;
+}
+
+/* LIST-06: below 600px the table becomes two stacked lines per issue rather than
+   a 720px-wide grid the viewport has to be dragged across. */
+@media (max-width: 600px) {
+  table.list {
+    min-width: 0;
+  }
+  .list colgroup,
+  .list thead {
+    display: none;
+  }
+  .list tbody tr {
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    grid-template-areas:
+      'select key title assignees'
+      'select status status updated';
+    align-items: center;
+    gap: 2px 8px;
+    padding: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .list tbody td {
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none !important;
+  }
+  .list td[data-col='select'] {
+    grid-area: select;
+  }
+  .list td[data-col='key'] {
+    grid-area: key;
+  }
+  .list td[data-col='priority'] {
+    display: none;
+  }
+  .list td[data-col='title'] {
+    grid-area: title;
+    white-space: normal;
+  }
+  .list td[data-col='status'] {
+    grid-area: status;
+  }
+  .list td[data-col='team'] {
+    display: none;
+  }
+  .list td[data-col='assignees'] {
+    grid-area: assignees;
+    justify-self: end;
+  }
+  .list td[data-col='updated'] {
+    grid-area: updated;
+    justify-self: end;
+  }
+  .list tbody tr.cursor {
+    box-shadow: inset 2px 0 0 var(--accent);
+    background: var(--bg-hover);
+  }
+  .list tbody tr.open {
+    background: var(--accent-soft);
+  }
 }

@@ -11,13 +11,14 @@ import {
   XCircle,
 } from 'lucide-react';
 import type { ActivityEvent, BoardItem } from '@shared/types';
-import { useActivity, useAddComment } from '@/api/hooks';
+import { useActivity, useAddComment, useAuth } from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
+import { TimeAgo } from '@/components/ui/Time';
 import { useToast } from '@/components/ui/Toast';
-import { formatDateTime, timeAgo } from '@/model/time';
+import { Composer } from './Composer';
+import { useDirtyDraft } from './drafts';
 import { MarkdownBody } from './Markdown';
-import { MentionInput } from './MentionInput';
 import { Reactions } from './Reactions';
 
 /** Icon and sentence for one non-comment timeline event. */
@@ -116,8 +117,11 @@ function describe(e: ActivityEvent): { icon: React.ReactNode; text: React.ReactN
 export function Activity({ item }: { item: BoardItem }) {
   const activity = useActivity(item.issueId);
   const add = useAddComment(item.issueId, item.itemId);
+  const { data: auth } = useAuth();
   const toast = useToast();
   const [draft, setDraft] = useState('');
+  // Closing the drawer on top of a half-written comment should ask first.
+  useDirtyDraft('comment', draft.trim().length > 0);
 
   const submit = () => {
     const body = draft.trim();
@@ -149,9 +153,7 @@ export function Activity({ item }: { item: BoardItem }) {
             <div style={{ minWidth: 0, flex: 1 }}>
               <div className="comment-head">
                 <b>{e.actor?.name ?? 'ghost'}</b>
-                <span className="faint" title={formatDateTime(e.createdAt)}>
-                  {timeAgo(e.createdAt)}
-                </span>
+                <TimeAgo className="faint" iso={e.createdAt} />
               </div>
               <MarkdownBody>{e.body ?? ''}</MarkdownBody>
               <Reactions subjectId={e.id} reactions={e.reactions ?? []} issueId={item.issueId} />
@@ -163,12 +165,15 @@ export function Activity({ item }: { item: BoardItem }) {
       )}
 
       <div className="composer">
-        <MentionInput
-          value={draft}
-          onChange={setDraft}
-          onSubmit={submit}
-          placeholder="Leave a comment… (Markdown supported, @ to mention)"
-        />
+        <div className="comment-composer">
+          <Avatar person={auth?.user ?? null} size={22} />
+          <Composer
+            value={draft}
+            onChange={setDraft}
+            placeholder="Leave a comment…"
+            onSubmit={submit}
+          />
+        </div>
         <div className="actions">
           <span className="faint">@ to mention · ⌘↵ to post</span>
           <Button
@@ -195,9 +200,7 @@ function EventRow({ event }: { event: ActivityEvent }) {
       <span className="truncate">
         <b>{event.actor?.name ?? 'someone'}</b> {d.text}
       </span>
-      <span className="faint" title={formatDateTime(event.createdAt)}>
-        {timeAgo(event.createdAt)}
-      </span>
+      <TimeAgo className="faint" iso={event.createdAt} />
     </>
   );
   return event.url ? (

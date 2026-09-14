@@ -1,9 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import * as RD from '@radix-ui/react-dialog';
 import {
   Archive,
   ArchiveRestore,
   CheckCircle2,
   ChevronDown,
+  ChevronUp,
   CircleDot,
   Eye,
   EyeOff,
@@ -28,13 +30,17 @@ import {
 } from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
+import { Confirm } from '@/components/ui/Confirm';
 import { Menu, MenuContent, MenuItem, MenuTrigger } from '@/components/ui/Menu';
 import { Picker } from '@/components/ui/Picker';
 import { useToast } from '@/components/ui/Toast';
 import { customFields } from '@/model/board';
+import { usePref } from '@/model/prefs';
 import { formatDateTime, timeAgo } from '@/model/time';
 import { useUi } from '../shell/state';
 import { Activity } from './Activity';
+import { Composer } from './Composer';
+import { DirtyCtx, useDirtyDraft } from './drafts';
 import { FieldEditor } from './FieldEditor';
 import { MarkdownBody } from './Markdown';
 import { Reactions } from './Reactions';
@@ -42,37 +48,180 @@ import { SubIssues } from './SubIssues';
 import './issue.css';
 
 export function IssuePanel() {
-  const { openKey, openIssue } = useUi();
+  const { openKey, openIssue, visibleKeys } = useUi();
   const { data: schema } = useSchema();
   const board = useBoard(Boolean(schema));
+  const [width, setWidth] = usePref<number>('panelWidth', 600);
+  const dirty = useRef(new Set<string>());
+  const [confirmClose, setConfirmClose] = useState(false);
+
+  const mark = useCallback((id: string, isDirty: boolean) => {
+    if (isDirty) dirty.current.add(id);
+    else dirty.current.delete(id);
+  }, []);
+
+  const close = useCallback(() => {
+    dirty.current.clear();
+    setConfirmClose(false);
+    openIssue(null);
+  }, [openIssue]);
+
+  // DRAWER-02: unsaved writing is the one thing here nothing else has a copy of.
+  const requestClose = useCallback(() => {
+    if (dirty.current.size > 0) setConfirmClose(true);
+    else close();
+  }, [close]);
+
+  const item = board.data?.items.find((i) => i.key.toLowerCase() === openKey?.toLowerCase());
+
+  // DRAWER-05: walk the order the view behind is showing.
+  const idx = openKey ? visibleKeys.indexOf(openKey) : -1;
+  const goTo = useCallback(
+    (delta: number) => {
+      if (idx === -1) return;
+      const next = visibleKeys[idx + delta];
+      if (!next) return;
+      if (dirty.current.size > 0) {
+        setConfirmClose(true);
+        return;
+      }
+      openIssue(next);
+    },
+    [idx, visibleKeys, openIssue],
+  );
+
+  useEffect(() => {
+    if (!openKey) return;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'j' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        goTo(1);
+      } else if (e.key === 'k' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        goTo(-1);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [openKey, goTo]);
+
+  // DRAWER-06: drag the left edge to resize; the width is remembered.
+  const onResize = (startX: number) => {
+    const startWidth = width;
+    const move = (e: PointerEvent) =>
+      setWidth(Math.min(Math.max(420, startWidth + (startX - e.clientX)), window.innerWidth - 120));
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+      document.body.style.userSelect = '';
+    };
+    document.body.style.userSelect = 'none';
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
   if (!openKey) return null;
-  const item = board.data?.items.find((i) => i.key.toLowerCase() === openKey.toLowerCase());
+
   return (
-    <>
-      <div className="panel-backdrop" onClick={() => openIssue(null)} />
-      <aside className="panel" aria-label={`Issue ${openKey}`}>
-        {item && schema ? (
-          <PanelContent key={item.itemId} item={item} onClose={() => openIssue(null)} />
-        ) : (
-          <>
-            <header className="panel-head">
-              <span className="mono muted">{openKey}</span>
-              <span className="spacer" />
-              <IconButton label="Close" shortcut="Esc" onClick={() => openIssue(null)}>
-                <X />
-              </IconButton>
-            </header>
-            <div className="panel-notfound">
-              {board.isPending ? <span className="spinner" /> : `${openKey} isn’t on this board.`}
-            </div>
-          </>
-        )}
-      </aside>
-    </>
+    <DirtyCtx.Provider value={mark}>
+      <RD.Root open onOpenChange={(o) => !o && requestClose()}>
+        <RD.Portal>
+          <RD.Overlay className="panel-backdrop" />
+          <RD.Content
+            className="panel"
+            style={{ width: `min(${width}px, 100vw)` }}
+            aria-describedby={undefined}
+            onOpenAutoFocus={(e) => {
+              e.preventDefault();
+              (e.currentTarget as HTMLElement).focus();
+            }}
+            // The confirm dialog owns the decision when there is unsaved text.
+            onEscapeKeyDown={(e) => {
+              e.preventDefault();
+              requestClose();
+            }}
+            onInteractOutside={(e) => {
+              e.preventDefault();
+              requestClose();
+            }}
+          >
+            <RD.Title className="sr-only">{item ? `${item.key}: ${item.title}` : openKey}</RD.Title>
+            {item && schema ? (
+              <PanelContent
+                key={item.itemId}
+                item={item}
+                onClose={requestClose}
+                onPrev={idx > 0 ? () => goTo(-1) : undefined}
+                onNext={idx !== -1 && idx < visibleKeys.length - 1 ? () => goTo(1) : undefined}
+                position={idx === -1 ? undefined : `${idx + 1} of ${visibleKeys.length}`}
+              />
+            ) : (
+              <>
+                <header className="panel-head">
+                  <span className="mono muted">{openKey}</span>
+                  <span className="spacer" />
+                  <IconButton label="Close" shortcut="Esc" onClick={requestClose}>
+                    <X />
+                  </IconButton>
+                </header>
+                <div className="panel-notfound">
+                  {board.isPending ? (
+                    <span className="spinner" />
+                  ) : (
+                    `${openKey} isn’t on this board.`
+                  )}
+                </div>
+              </>
+            )}
+            <div
+              className="panel-resize"
+              role="separator"
+              aria-label="Resize panel"
+              aria-orientation="vertical"
+              tabIndex={0}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                onResize(e.clientX);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ArrowLeft')
+                  setWidth((w) => Math.min(w + 32, window.innerWidth - 120));
+                if (e.key === 'ArrowRight') setWidth((w) => Math.max(w - 32, 420));
+              }}
+            />
+          </RD.Content>
+        </RD.Portal>
+      </RD.Root>
+
+      <Confirm
+        open={confirmClose}
+        onOpenChange={setConfirmClose}
+        title="Discard what you’ve written?"
+        body="This issue has an unsaved description or comment. Closing now throws it away."
+        confirmLabel="Discard"
+        danger
+        onConfirm={close}
+      />
+    </DirtyCtx.Provider>
   );
 }
 
-function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void }) {
+function PanelContent({
+  item,
+  onClose,
+  onPrev,
+  onNext,
+  position,
+}: {
+  item: BoardItem;
+  onClose: () => void;
+  onPrev?: () => void;
+  onNext?: () => void;
+  position?: string;
+}) {
   const { data: schema } = useSchema();
   const update = useUpdateIssue();
   const archive = useArchiveItem();
@@ -83,6 +232,7 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
 
   const [title, setTitle] = useState(item.title);
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const [saved, setSaved] = useState<string | null>(null);
   useEffect(() => setTitle(item.title), [item.title]);
   useEffect(() => {
     const el = titleRef.current;
@@ -94,9 +244,19 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
 
   const [editingBody, setEditingBody] = useState(false);
   const [bodyDraft, setBodyDraft] = useState(item.body);
+  useDirtyDraft('body', editingBody && bodyDraft !== item.body);
+
+  // DRAWER-04: a write that happens on blur needs to say that it happened.
+  const flagSaved = (what: string) => {
+    setSaved(what);
+    window.setTimeout(() => setSaved((s) => (s === what ? null : s)), 1800);
+  };
 
   const patch = (body: Parameters<typeof update.mutate>[0], what: string) =>
-    update.mutate(body, { onError: (e) => toast.error(`Couldn’t update ${what}: ${e.message}`) });
+    update.mutate(body, {
+      onSuccess: () => flagSaved(what),
+      onError: (e) => toast.error(`Couldn’t update ${what}: ${e.message}`),
+    });
 
   const commitTitle = () => {
     const t = title.trim();
@@ -120,6 +280,15 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
     const person = members?.find((m) => m.id === id);
     if (has) setAssignees(item.assignees.filter((a) => a.id !== id));
     else if (person) setAssignees([...item.assignees, person]);
+  };
+
+  const copy = async (text: string, label: string) => {
+    try {
+      await navigator.clipboard?.writeText(text);
+      toast.success(label);
+    } catch {
+      toast.error('Couldn’t reach the clipboard. Copy the address bar instead.');
+    }
   };
 
   const fields = schema ? customFields(schema) : [];
@@ -198,8 +367,27 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
             )}
           </MenuContent>
         </Menu>
+        {saved && <span className="saved-flag">Saved</span>}
         <span className="spacer" />
         {item.isArchived && <span className="tag">Archived</span>}
+
+        {/* DRAWER-05 */}
+        <span className="panel-nav">
+          <IconButton
+            label="Previous issue"
+            shortcut="K"
+            size="sm"
+            disabled={!onPrev}
+            onClick={onPrev}
+          >
+            <ChevronUp />
+          </IconButton>
+          <IconButton label="Next issue" shortcut="J" size="sm" disabled={!onNext} onClick={onNext}>
+            <ChevronDown />
+          </IconButton>
+          {position && <span className="faint panel-pos">{position}</span>}
+        </span>
+
         <IconButton
           label={item.viewerStarred ? 'Unstar' : 'Star'}
           className={item.viewerStarred ? 'on' : ''}
@@ -246,12 +434,12 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
           </MenuTrigger>
           <MenuContent align="end">
             <MenuItem
-              onSelect={() => {
-                void navigator.clipboard?.writeText(
+              onSelect={() =>
+                void copy(
                   `${window.location.origin}/board?i=${item.key}`,
-                );
-                toast.success(`Copied a link to ${item.key}`);
-              }}
+                  `Copied a link to ${item.key}`,
+                )
+              }
             >
               <Link2 /> Copy link
             </MenuItem>
@@ -263,6 +451,14 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
                     onSuccess: () =>
                       toast.success(
                         item.isArchived ? `${item.key} restored` : `${item.key} archived`,
+                        {
+                          action: {
+                            label: 'Undo',
+                            undo: true,
+                            onClick: () =>
+                              archive.mutate({ itemId: item.itemId, archived: item.isArchived }),
+                          },
+                        },
                       ),
                     onError: (e) => toast.error(`Couldn’t archive: ${e.message}`),
                   },
@@ -274,12 +470,10 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
             </MenuItem>
           </MenuContent>
         </Menu>
+        {/* DRAWER-03: this used to be a second "Copy link" wearing an external-link icon. */}
         <IconButton
-          label="Copy link"
-          onClick={() => {
-            navigator.clipboard.writeText(item.url);
-            toast.success('Link copied');
-          }}
+          label="Open in GitHub"
+          onClick={() => window.open(item.url, '_blank', 'noopener')}
         >
           <ExternalLink />
         </IconButton>
@@ -302,6 +496,7 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
               (e.target as HTMLTextAreaElement).blur();
             }
             if (e.key === 'Escape') {
+              e.preventDefault(); // reverting is handling it; the drawer stays open
               setTitle(item.title);
               (e.target as HTMLTextAreaElement).blur();
             }
@@ -311,12 +506,12 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
 
         {editingBody ? (
           <div className="composer">
-            <textarea
-              className="textarea"
-              style={{ minHeight: 160 }}
-              autoFocus
+            <Composer
               value={bodyDraft}
-              onChange={(e) => setBodyDraft(e.target.value)}
+              onChange={setBodyDraft}
+              minHeight={160}
+              autoFocus
+              placeholder="Describe the bug…"
             />
             <div className="actions">
               <Button size="sm" variant="ghost" onClick={() => setEditingBody(false)}>
@@ -447,7 +642,7 @@ function PanelContent({ item, onClose }: { item: BoardItem; onClose: () => void 
   );
 }
 
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+function FieldRow({ label, children }: { label: string; children: ReactNode }) {
   return (
     <>
       <span className="label">{label}</span>
