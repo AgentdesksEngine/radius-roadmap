@@ -3,10 +3,10 @@ import type { Dashboard } from '@shared/types';
 import { useBoard, useDashboards, useSchema } from '@/api/hooks';
 import { Button } from '@/components/ui/Button';
 import { MODULE, STATUS, TEAM, WORK_TYPE, field, filterItems } from '@/model/board';
-import { ageBuckets, cycleTime, openByField, summarize, throughput } from '@/model/analytics';
+import { ageBuckets, completedByPerson, cycleTime, openByField, summarize, throughput } from '@/model/analytics';
 import { ViewHeader } from '../shell/ViewHeader';
 import { useUi } from '../shell/state';
-import { BarList, StatTile, ThroughputChart } from './Charts';
+import { BarList, CompletedTable, StatTile, ThroughputChart } from './Charts';
 import { AddWidget, DashboardPicker, DEFAULT_DASHBOARD_ID, RemoveWidget } from './Dashboards';
 import { widgetData, widgetTitle } from './widgets';
 import './analytics.css';
@@ -35,6 +35,7 @@ export function AnalyticsView() {
   const weeks = useMemo(() => throughput(items), [items]);
   const cycle = useMemo(() => cycleTime(items), [items]);
   const ages = useMemo(() => ageBuckets(items), [items]);
+  const completed = useMemo(() => completedByPerson(items), [items]);
 
   const scope = filters.team ? `${filters.team} · ` : '';
 
@@ -125,6 +126,7 @@ export function AnalyticsView() {
               buckets={ages}
               empty="No open issues"
             />
+            <CompletedTable rows={completed} />
           </div>
         </div>
       )}
@@ -183,6 +185,8 @@ function CustomDashboard({
               <RemoveWidget dashboard={dashboard} widgetId={w.id} />
               {data.kind === 'throughput' ? (
                 <ThroughputChart data={data.data} />
+              ) : data.kind === 'people' ? (
+                <CompletedTable rows={data.rows} title={data.title} />
               ) : data.kind === 'bars' ? (
                 <BarList
                   title={data.title}

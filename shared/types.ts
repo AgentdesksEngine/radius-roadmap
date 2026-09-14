@@ -286,7 +286,7 @@ export interface SavedView {
  * A dashboard widget names a measure from src/model/analytics.ts, nothing more. There is no
  * stored query: every widget runs over the board the client already has.
  */
-export type WidgetMeasure = 'stat' | 'openByField' | 'throughput' | 'age' | 'cycleTime';
+export type WidgetMeasure = 'stat' | 'openByField' | 'throughput' | 'age' | 'cycleTime' | 'completedByPerson';
 
 export type WidgetStat = 'open' | 'createdRecently' | 'closedRecently' | 'needsTriage' | 'urgentOpen' | 'net';
 
