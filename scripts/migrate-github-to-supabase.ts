@@ -34,7 +34,7 @@ import { getActivity, getBoard, getComments, getSchema } from '../api/_lib/githu
 import type { GitHubBoardItem } from '../api/_lib/github/board';
 import { GitHubGraphQLError } from '../api/_lib/github/gql';
 import { HttpError } from '../api/_lib/http';
-import { db } from '../api/_lib/db/pool';
+import { asJson, db } from '../api/_lib/db/pool';
 import { fields as fieldSpecs } from '../fields.config';
 import { emailToLogin } from '../import.config';
 import { seedFieldSchema, type FieldMaps } from './_field-schema';
@@ -295,7 +295,7 @@ async function migrateIssue(
       ) values (
         ${item.issueId}, ${item.number}, ${item.title}, ${item.body}, ${item.state}, ${item.stateReason},
         ${authorId}, ${item.createdAt}, ${item.updatedAt}, ${item.closedAt}, ${item.isArchived},
-        ${position}, ${JSON.stringify(fieldsJson)}::jsonb
+        ${position}, ${tx.json(asJson(fieldsJson))}::jsonb
       )
       on conflict (github_issue_id) do update set
         title = excluded.title, body = excluded.body, state = excluded.state,

@@ -9,7 +9,7 @@ import { Logo } from '@/components/ui/Logo';
 import { Picker } from '@/components/ui/Picker';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
-import { MODULE, PRIORITY, STATUS, TEAM, WORK_TYPE, field } from '@/model/board';
+import { MODULE, PRIORITY, STATUS, TEAM, WORK_TYPE, field, selectWrite } from '@/model/board';
 import { Composer } from '../issue/Composer';
 import { PriorityIcon } from '../board/PriorityIcon';
 import { useUi } from '../shell/state';
@@ -123,7 +123,11 @@ export function NewIssueDialog() {
     const t = title.trim();
     if (!t || create.isPending) return;
     const fields: Record<string, FieldWriteValue> = {};
-    for (const [name, id] of Object.entries(picks)) fields[name] = { singleSelectOptionId: id };
+    for (const [name, id] of Object.entries(picks)) {
+      const f = field(schema, name);
+      const v = f && selectWrite(f, [id]);
+      if (v) fields[name] = v;
+    }
     create.mutate(
       {
         title: t,

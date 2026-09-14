@@ -417,6 +417,88 @@ a.event:hover b {
   opacity: 0.6;
 }
 
+/* Watch / star live in the panel header next to the icon buttons. */
+.watch-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 24px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--text-2);
+  font-size: 11.5px;
+  cursor: pointer;
+}
+.watch-btn:hover { background: var(--bg-hover); color: var(--text); }
+.watch-btn.on { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+.watch-btn svg { width: 13px; height: 13px; }
+.watch-btn .count { font-variant-numeric: tabular-nums; color: var(--text-3); }
+
+.icon-btn.on { color: var(--c-yellow); }
+
+.pr-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 11px;
+  text-decoration: none;
+  color: var(--text-2);
+  font-variant-numeric: tabular-nums;
+}
+.pr-chip svg { width: 11px; height: 11px; }
+.pr-chip:hover { border-color: var(--border-strong); }
+.pr-chip.open { color: var(--c-green); }
+.pr-chip.merged { color: var(--c-purple); }
+.pr-chip.closed { color: var(--text-3); }
+
+/* @mentions render as a chip, never as a raw mention: link. */
+.md .mention,
+.mention {
+  padding: 0 4px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 500;
+}
+
+/* @-picker anchored under the comment box. Positioned relative to the composer rather than
+   the caret: a textarea gives no caret coordinates without measuring a mirror element, and
+   the box is short enough that under-the-field is never far from where you are typing. */
+.mention-wrap {
+  position: relative;
+}
+
+.mention-menu {
+  position: absolute;
+  z-index: 30;
+  top: 100%;
+  left: 0;
+  min-width: 220px;
+  margin: 4px 0 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-pop);
+}
+.mention-menu li { margin: 0; }
+.mention-menu .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.mention-menu .menu-item.active { background: var(--bg-hover); }
 /* DRAWER-06: drag the left edge to resize; arrow keys do it from the keyboard. */
 .panel-resize {
   position: absolute;

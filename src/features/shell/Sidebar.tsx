@@ -5,7 +5,9 @@ import {
   Archive,
   BarChart3,
   Bookmark,
+  Compass,
   ExternalLink,
+  Home,
   Inbox,
   Keyboard,
   LayoutGrid,
@@ -14,6 +16,8 @@ import {
   Monitor,
   Moon,
   MoreHorizontal,
+  Pin,
+  PinOff,
   Plus,
   Sheet,
   Sun,
@@ -45,16 +49,9 @@ export function Sidebar() {
   const { data: auth } = useAuth();
   const { data: schema } = useSchema();
   const { data: board } = useBoard(Boolean(schema));
-  const {
-    filters,
-    setFilters,
-    setNewIssueOpen,
-    groupBy,
-    sidebarOpen,
-    setSidebarOpen,
-    setShortcutsOpen,
-  } = useUi();
-  const { views, save, remove } = useSavedViews();
+  const { filters, setFilters, setNewIssueOpen, groupBy, sidebarOpen, setSidebarOpen, setShortcutsOpen, startTour } =
+    useUi();
+  const { views, save, remove, setPinned } = useSavedViews();
   const [theme, setTheme] = useTheme();
   const qc = useQueryClient();
   const navigate = useNavigate();
@@ -85,8 +82,9 @@ export function Sidebar() {
   const saveCurrentView = () => {
     const name = naming?.trim();
     if (!name) return;
-    save({ name, path: location.pathname, filters, groupBy });
-    toast.success(`Saved “${name}”`);
+    save({ name, path: location.pathname, filters, groupBy })
+      .then(() => toast.success(`Saved “${name}”`))
+      .catch((e: Error) => toast.error(`Couldn’t save the view: ${e.message}`));
     setNaming(null);
   };
 
@@ -107,18 +105,21 @@ export function Sidebar() {
           <X />
         </IconButton>
       </div>
-      <Button className="new-issue-btn" icon={<Plus />} onClick={() => setNewIssueOpen(true)}>
+      <Button className="new-issue-btn" icon={<Plus />} onClick={() => setNewIssueOpen(true)} data-tour="new-issue">
         New issue
         <kbd className="kbd" style={{ marginLeft: 'auto' }}>
           C
         </kbd>
       </Button>
 
-      <NavLink to="/inbox" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink to="/home" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-tour="nav-home">
+        <Home /> Home
+      </NavLink>
+      <NavLink to="/inbox" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-tour="nav-intake">
         <Inbox /> Intake
         <span className="count">{intakeCount || ''}</span>
       </NavLink>
-      <NavLink to="/board" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink to="/board" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`} data-tour="nav-board">
         <LayoutGrid /> Board
       </NavLink>
       <NavLink to="/list" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
@@ -127,7 +128,11 @@ export function Sidebar() {
       <NavLink to="/sheet" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
         <Sheet /> Spreadsheet
       </NavLink>
-      <NavLink to="/analytics" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+      <NavLink
+        to="/analytics"
+        className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+        data-tour="nav-analytics"
+      >
         <BarChart3 /> Analytics
       </NavLink>
       <button
@@ -170,7 +175,7 @@ export function Sidebar() {
         </button>
       )}
 
-      <div className="sidebar-section">
+      <div className="sidebar-section" data-tour="views">
         <span>Views</span>
         <IconButton
           label="Save the current filters as a view"
@@ -186,7 +191,7 @@ export function Sidebar() {
       {views.map((v) => (
         <div key={v.id} className="nav-row">
           <button className="nav-item" onClick={() => navigate(viewHref(v))}>
-            <Bookmark /> <span className="truncate">{v.name}</span>
+            {v.pinned ? <Pin /> : <Bookmark />} <span className="truncate">{v.name}</span>
           </button>
           <Menu>
             <MenuTrigger asChild>
@@ -195,6 +200,9 @@ export function Sidebar() {
               </button>
             </MenuTrigger>
             <MenuContent align="end">
+              <MenuItem onSelect={() => setPinned(v.id, !v.pinned)}>
+                {v.pinned ? <PinOff /> : <Pin />} {v.pinned ? 'Unpin from Home' : 'Pin to Home'}
+              </MenuItem>
               <MenuItem
                 onSelect={() => {
                   void navigator.clipboard?.writeText(`${window.location.origin}${viewHref(v)}`);
@@ -262,6 +270,9 @@ export function Sidebar() {
               <ExternalLink /> Open project home
             </MenuItem>
             <MenuItem onSelect={() => qc.invalidateQueries()}>Refresh data</MenuItem>
+            <MenuItem onSelect={() => startTour()}>
+              <Compass /> Show tour
+            </MenuItem>
             <MenuItem onSelect={() => setShortcutsOpen(true)} hint="?">
               <Keyboard /> Keyboard shortcuts
             </MenuItem>
@@ -280,11 +291,7 @@ export function Sidebar() {
           <MenuContent side="top" align="end">
             <MenuLabel>Theme</MenuLabel>
             {THEMES.map((t) => (
-              <MenuItem
-                key={t.id}
-                onSelect={() => setTheme(t.id)}
-                hint={theme === t.id ? '✓' : undefined}
-              >
+              <MenuItem key={t.id} onSelect={() => setTheme(t.id)} hint={theme === t.id ? '✓' : undefined}>
                 {t.icon} {t.label}
               </MenuItem>
             ))}

@@ -13,7 +13,7 @@ import {
   MenuTrigger,
 } from '@/components/ui/Menu';
 import { Picker, type PickerItem } from '@/components/ui/Picker';
-import { TEAM, activeFilterCount, selectFields, type StateFilter } from '@/model/board';
+import { TEAM, activeFilterCount, filterableFields, type StateFilter } from '@/model/board';
 import { useUi } from '../shell/state';
 
 const STATE_LABEL: Record<StateFilter, string> = {
@@ -32,7 +32,7 @@ export function FilterBar() {
   const { data: members } = useMembers(picking === ASSIGNEE || filters.assignees.length > 0);
 
   if (!schema) return null;
-  const fields = selectFields(schema).filter((f) => f.name !== TEAM || filters.team === null);
+  const fields = filterableFields(schema).filter((f) => f.name !== TEAM || filters.team === null);
 
   const fieldItems = (f: ProjectField): PickerItem[] => [
     { id: '__none', label: `No ${f.name.toLowerCase()}` },
@@ -79,7 +79,9 @@ export function FilterBar() {
     chips.push({
       key: ASSIGNEE,
       label: 'Assignee',
-      values: filters.assignees.map((a) => (a === '__none' ? 'none' : a)),
+      values: filters.assignees.map((a) =>
+        a === '__none' ? 'none' : (assigneeItems.find((i) => i.id === a)?.label ?? '…'),
+      ),
       items: assigneeItems,
       onToggle: (id) => setFilters((p) => ({ ...p, assignees: toggle(p.assignees, id) })),
       onRemove: () => setFilters((p) => ({ ...p, assignees: [] })),
@@ -92,7 +94,7 @@ export function FilterBar() {
   const closedCount = board?.items.filter((i) => i.state === 'CLOSED').length ?? 0;
 
   return (
-    <div className="filter-bar">
+    <div className="filter-bar" data-tour="filters">
       {chips.map((c) => (
         <span key={c.key} className="chip">
           <span className="k">{c.label}</span>

@@ -28,6 +28,10 @@ interface UiState {
   setPaletteOpen: (o: boolean) => void;
   shortcutsOpen: boolean;
   setShortcutsOpen: (o: boolean) => void;
+  /** The guided tour. Runs itself on a first visit; "Show tour" in the user menu replays it. */
+  tourOpen: boolean;
+  startTour: () => void;
+  endTour: () => void;
   /** The sidebar as a sheet, below the 800px breakpoint where it is otherwise hidden. */
   sidebarOpen: boolean;
   setSidebarOpen: (o: boolean) => void;
@@ -139,10 +143,14 @@ export function UiStateProvider({ children }: { children: ReactNode }) {
   const [newIssueOpen, setNewIssueOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selection, setSelection] = useState<string[]>([]);
   const [visibleKeys, setVisibleKeys] = useState<string[]>([]);
   const [visibleIds, setVisibleIds] = useState<string[]>([]);
+
+  const startTour = useCallback(() => setTourOpen(true), []);
+  const endTour = useCallback(() => setTourOpen(false), []);
 
   const toggleSelected = useCallback((itemId: string, additive = true) => {
     setSelection((prev) => {
@@ -177,6 +185,9 @@ export function UiStateProvider({ children }: { children: ReactNode }) {
       setPaletteOpen,
       shortcutsOpen,
       setShortcutsOpen,
+      tourOpen,
+      startTour,
+      endTour,
       sidebarOpen,
       setSidebarOpen,
       selection,
@@ -198,6 +209,9 @@ export function UiStateProvider({ children }: { children: ReactNode }) {
       newIssueOpen,
       paletteOpen,
       shortcutsOpen,
+      tourOpen,
+      startTour,
+      endTour,
       sidebarOpen,
       selection,
       toggleSelected,

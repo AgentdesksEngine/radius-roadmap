@@ -15,8 +15,9 @@
  * which lands the issue in the Intake view, which is exactly the queue a human should see.
  */
 import type { ProjectSchema } from '../../../shared/types.js';
-import { db, withActor } from '../db/pool.js';
+import { asJson, db, withActor } from '../db/pool.js';
 import { getItem, getSchema } from '../db/board.js';
+import { ensureWatchers } from '../notify.js';
 import type { BoardItem } from '../../../shared/types.js';
 import type { SlackMessage, SlackUser } from './client.js';
 
@@ -175,11 +176,13 @@ export function parseHints(hintText: string, schema: ProjectSchema): DraftFields
     if (platform && optionExists(schema, 'Platform', platform) && !platforms.includes(platform))
       platforms.push(platform);
 
-    if (!out.select.Team && optionExists(schema, 'Team', w)) {
+    if (optionExists(schema, 'Team', w)) {
       const team = schema.fields
         .find((f) => f.name === 'Team')
         ?.options?.find((o) => o.name.toLowerCase() === w);
-      if (team) out.select.Team = team.name;
+      // An issue can span platforms, so it can belong to several teams.
+      if (team && !(out.multiSelect.Team ?? []).includes(team.name))
+        out.multiSelect.Team = [...(out.multiSelect.Team ?? []), team.name];
     }
   }
 
@@ -364,12 +367,15 @@ export async function ingestSlackMessage(args: {
   const issueId = await withActor(authorId, async (tx) => {
     const rows = await tx<{ id: string }[]>`
       insert into issues (title, body, author_id, fields, slack_channel_id, slack_message_ts)
-      values (${draft.title}, ${draft.body}, ${authorId}, ${JSON.stringify(fieldsJson)}::jsonb, ${args.channelId}, ${args.parent.ts})
+      values (${draft.title}, ${draft.body}, ${authorId}, ${tx.json(asJson(fieldsJson))}::jsonb, ${args.channelId}, ${args.parent.ts})
       on conflict (slack_channel_id, slack_message_ts) where slack_channel_id is not null and slack_message_ts is not null
       do nothing
       returning id
     `;
-    if (rows[0]) return rows[0].id;
+    if (rows[0]) {
+      if (authorId) await ensureWatchers(tx, rows[0].id, [{ profileId: authorId, source: 'author' }]);
+      return rows[0].id;
+    }
     // Lost the race against a concurrent delivery of the same event — take theirs.
     const raced = await tx<{ id: string }[]>`
       select id from issues where slack_channel_id = ${args.channelId} and slack_message_ts = ${args.parent.ts} limit 1

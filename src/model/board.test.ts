@@ -9,7 +9,11 @@ import {
   matchesQuery,
   missingTriageFields,
   needsTriage,
+  optionRank,
+  selectNames,
+  selectOptions,
   sortItems,
+  teamCounts,
 } from './board';
 
 const schema: ProjectSchema = {
@@ -74,6 +78,10 @@ function item(partial: Partial<BoardItem> & { number: number }): BoardItem {
     subIssues: { total: 0, completed: 0, percent: 0 },
     reactions: [],
     fields: {},
+    pullRequests: [],
+    watcherCount: 0,
+    viewerWatching: false,
+    viewerStarred: false,
     ...partial,
   };
 }
@@ -218,5 +226,78 @@ describe('childrenOf', () => {
 describe('manual sort', () => {
   it('leaves the project order untouched', () => {
     expect(sortItems(items, 'manual', 'asc', schema).map((i) => i.number)).toEqual([1, 2, 3]);
+  });
+});
+
+// ---------- Multi-valued Team ----------
+
+const multiSchema: ProjectSchema = {
+  ...schema,
+  fields: schema.fields.map((f) =>
+    f.name === 'Team' ? { ...f, dataType: 'MULTI_SELECT' as const } : f,
+  ),
+};
+
+const teamItem = (number: number, names: ('iOS' | 'Web')[]) =>
+  item({
+    number,
+    fields: {
+      Team: {
+        kind: 'multiSelect',
+        options: names.map((n) => ({ id: n === 'iOS' ? 'ios' : 'web', name: n })),
+      },
+      Priority: { kind: 'singleSelect', optionId: 'low', name: 'Low' },
+      'Work type': { kind: 'singleSelect', optionId: 'bug', name: 'Bug' },
+    },
+  });
+
+describe('multi-valued Team', () => {
+  it('reads every option name, and still reads single-select fields', () => {
+    expect(selectNames(teamItem(1, ['iOS', 'Web']), 'Team')).toEqual(['iOS', 'Web']);
+    expect(selectNames(teamItem(1, []), 'Team')).toEqual([]);
+    expect(selectNames(items[0]!, 'Team')).toEqual(['iOS']);
+  });
+
+  it('resolves options against the schema so colours survive', () => {
+    const opts = selectOptions(
+      teamItem(1, ['Web']),
+      multiSchema.fields.find((f) => f.name === 'Team'),
+    );
+    expect(opts.map((o) => [o.name, o.color])).toEqual([['Web', 'PURPLE']]);
+  });
+
+  it('matches the team lens if the issue belongs to that team among others', () => {
+    const list = [teamItem(1, ['iOS', 'Web']), teamItem(2, ['Web']), teamItem(3, [])];
+    const onlyIos = filterItems(list, { ...DEFAULT_FILTERS, team: 'iOS' });
+    expect(onlyIos.map((i) => i.number)).toEqual([1]);
+    const onlyWeb = filterItems(list, { ...DEFAULT_FILTERS, team: 'Web' });
+    expect(onlyWeb.map((i) => i.number)).toEqual([1, 2]);
+  });
+
+  it('matches a select filter when any of its options was picked', () => {
+    const list = [teamItem(1, ['iOS', 'Web']), teamItem(2, ['Web']), teamItem(3, [])];
+    const picked = filterItems(list, { ...DEFAULT_FILTERS, select: { Team: ['iOS'] } });
+    expect(picked.map((i) => i.number)).toEqual([1]);
+    const none = filterItems(list, { ...DEFAULT_FILTERS, select: { Team: ['__none'] } });
+    expect(none.map((i) => i.number)).toEqual([3]);
+  });
+
+  it('counts an issue under each of its teams', () => {
+    const counts = teamCounts([teamItem(1, ['iOS', 'Web']), teamItem(2, ['Web']), teamItem(3, [])]);
+    expect(counts.get('iOS')).toBe(1);
+    expect(counts.get('Web')).toBe(2);
+    expect(counts.get('__none')).toBe(1);
+  });
+
+  it('treats any team as satisfying the Team triage requirement', () => {
+    expect(missingTriageFields(teamItem(1, ['Web']))).not.toContain('Team');
+    expect(missingTriageFields(teamItem(2, []))).toContain('Team');
+  });
+
+  it('sorts a multi-team issue by its highest-ranked team', () => {
+    // iOS is option 0, Web option 1, so an iOS+Web issue ranks with iOS.
+    expect(optionRank(multiSchema, 'Team', teamItem(1, ['Web', 'iOS']))).toBe(0);
+    expect(optionRank(multiSchema, 'Team', teamItem(2, ['Web']))).toBe(1);
+    expect(optionRank(multiSchema, 'Team', teamItem(3, []))).toBe(Number.MAX_SAFE_INTEGER);
   });
 });

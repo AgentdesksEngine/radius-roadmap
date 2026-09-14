@@ -1,5 +1,5 @@
 import type { BoardItem, OptionColor, ProjectField } from '@shared/types';
-import { PRIORITY, needsTriage, selectName } from './board';
+import { PRIORITY, needsTriage, selectName, selectNames } from './board';
 
 const DAY = 24 * 3600_000;
 const WEEK = 7 * DAY;
@@ -52,16 +52,19 @@ export function throughput(items: BoardItem[], weeks = 12, now = Date.now()): We
   return [...points.values()];
 }
 
-/** Open issues per option of one single-select field, in the field's own option order. */
+/** Open issues per option of a select field, in the field's own option order. */
 export function openByField(items: BoardItem[], f: ProjectField | undefined): Bucket[] {
   if (!f?.options) return [];
   const counts = new Map<string, number>();
   let none = 0;
   for (const it of items) {
     if (it.state !== 'OPEN') continue;
-    const name = selectName(it, f.name);
-    if (!name) none += 1;
-    else counts.set(name, (counts.get(name) ?? 0) + 1);
+    // selectNames, not selectName: Team is multi-valued, and an issue owned by two teams
+    // belongs in both bars. Totals can therefore exceed the issue count, which is correct
+    // for a breakdown.
+    const names = selectNames(it, f.name);
+    if (!names.length) none += 1;
+    else for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
   }
   const buckets: Bucket[] = f.options.map((o) => ({
     label: o.name,

@@ -8,6 +8,7 @@ const GROUPS: { title: string; rows: [string[], string][] }[] = [
     rows: [
       [['⌘', 'K'], 'Command palette'],
       [['C'], 'New issue'],
+      [['H'], 'Home'],
       [['/'], 'Search issues'],
       [['?'], 'This list'],
       [['Esc'], 'Clear the search, the selection, then close what’s open'],
@@ -20,6 +21,7 @@ const GROUPS: { title: string; rows: [string[], string][] }[] = [
       [['K'], 'Previous issue'],
       [['Enter'], 'Open the issue'],
       [['⌘', '↵'], 'Save or post what you’re writing'],
+      [['@'], 'Mention someone in a comment'],
     ],
   },
   {

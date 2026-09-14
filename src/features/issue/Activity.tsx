@@ -175,7 +175,7 @@ export function Activity({ item }: { item: BoardItem }) {
           />
         </div>
         <div className="actions">
-          <span className="faint">⌘↵ to post</span>
+          <span className="faint">@ to mention · ⌘↵ to post</span>
           <Button
             variant="primary"
             size="sm"

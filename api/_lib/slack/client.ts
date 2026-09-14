@@ -105,4 +105,29 @@ export class SlackClient {
       // already_reacted / no permission — cosmetic only, never fail the ingest for it.
     }
   }
+
+  /**
+   * Slack id for an email address, or undefined when nobody in the workspace has it.
+   * `users_not_found` is the expected answer for a teammate who never joined Slack, so it is
+   * not an error — every other failure still throws.
+   */
+  async lookupByEmail(email: string): Promise<string | undefined> {
+    try {
+      const r = await call<{ user?: SlackUser }>(this.token, 'users.lookupByEmail', { email });
+      return r.user?.id;
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('users_not_found')) return undefined;
+      throw err;
+    }
+  }
+
+  /** Opens (or re-opens) the IM channel with a user. Needs the `im:write` scope. */
+  async openDm(userId: string): Promise<string | undefined> {
+    const r = await call<{ channel?: { id: string } }>(this.token, 'conversations.open', { users: userId });
+    return r.channel?.id;
+  }
+
+  async postDm(channel: string, text: string): Promise<void> {
+    await call(this.token, 'chat.postMessage', { channel, text, unfurl_links: false });
+  }
 }

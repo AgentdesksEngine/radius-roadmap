@@ -7,15 +7,27 @@ import {
   ChevronDown,
   ChevronUp,
   CircleDot,
+  Eye,
+  EyeOff,
   ExternalLink,
+  GitPullRequest,
   Link2,
   MoreHorizontal,
   Pencil,
+  Star,
   X,
   XCircle,
 } from 'lucide-react';
 import type { BoardItem, Person } from '@shared/types';
-import { useArchiveItem, useBoard, useMembers, useSchema, useUpdateIssue } from '@/api/hooks';
+import {
+  useArchiveItem,
+  useBoard,
+  useMembers,
+  useSchema,
+  useSetStarred,
+  useSetWatching,
+  useUpdateIssue,
+} from '@/api/hooks';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Confirm } from '@/components/ui/Confirm';
@@ -213,6 +225,8 @@ function PanelContent({
   const { data: schema } = useSchema();
   const update = useUpdateIssue();
   const archive = useArchiveItem();
+  const watch = useSetWatching();
+  const star = useSetStarred();
   const toast = useToast();
   const { data: members } = useMembers();
 
@@ -374,6 +388,44 @@ function PanelContent({
           {position && <span className="faint panel-pos">{position}</span>}
         </span>
 
+        <IconButton
+          label={item.viewerStarred ? 'Unstar' : 'Star'}
+          className={item.viewerStarred ? 'on' : ''}
+          onClick={() =>
+            star.mutate(
+              { issueId: item.issueId, itemId: item.itemId, starred: !item.viewerStarred },
+              {
+                onSuccess: () =>
+                  toast.success(item.viewerStarred ? 'Removed from Home' : 'Starred — it is on your Home now'),
+                onError: (e) => toast.error(`Couldn’t star: ${e.message}`),
+              },
+            )
+          }
+        >
+          <Star fill={item.viewerStarred ? 'currentColor' : 'none'} />
+        </IconButton>
+        <button
+          className={`watch-btn ${item.viewerWatching ? 'on' : ''}`}
+          data-tour="watch"
+          onClick={() =>
+            watch.mutate(
+              { issueId: item.issueId, itemId: item.itemId, watching: !item.viewerWatching },
+              {
+                onSuccess: () =>
+                  toast.success(
+                    item.viewerWatching
+                      ? `No more updates about ${item.key}`
+                      : `Watching ${item.key} — updates come as a Slack DM`,
+                  ),
+                onError: (e) => toast.error(`Couldn’t change watching: ${e.message}`),
+              },
+            )
+          }
+        >
+          {item.viewerWatching ? <Eye /> : <EyeOff />}
+          {item.viewerWatching ? 'Watching' : 'Watch'}
+          {item.watcherCount > 0 && <span className="count">{item.watcherCount}</span>}
+        </button>
         <Menu>
           <MenuTrigger asChild>
             <button className="icon-btn" aria-label="More actions">
@@ -545,6 +597,25 @@ function PanelContent({
               <FieldEditor item={item} field={f} />
             </FieldRow>
           ))}
+          {item.pullRequests.length > 0 && (
+            <FieldRow label="Pull requests">
+              <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>
+                {item.pullRequests.map((pr) => (
+                  <a
+                    key={`${pr.repo}#${pr.number}`}
+                    className={`pr-chip ${pr.state}`}
+                    href={pr.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    title={`${pr.repo}#${pr.number} — ${pr.title || pr.state}`}
+                  >
+                    <GitPullRequest />#{pr.number}
+                    <span className="faint">{pr.draft && pr.state === 'open' ? 'draft' : pr.state}</span>
+                  </a>
+                ))}
+              </span>
+            </FieldRow>
+          )}
           {item.labels.length > 0 && (
             <FieldRow label="Labels">
               <span style={{ display: 'inline-flex', gap: 6, flexWrap: 'wrap' }}>

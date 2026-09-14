@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useNavigate } from 'react-router-dom';
 import { useBoard, useSchema } from '@/api/hooks';
 import { useBoardRealtime } from '@/api/realtime';
 import { Button } from '@/components/ui/Button';
@@ -9,6 +9,7 @@ import { useUi } from './state';
 import { IssuePanel } from '../issue/IssuePanel';
 import { NewIssueDialog } from '../new-issue/NewIssueDialog';
 import { CommandPalette } from '../palette/CommandPalette';
+import { Tour } from '../tour/Tour';
 import './shell.css';
 
 function isTyping(e: KeyboardEvent) {
@@ -18,6 +19,7 @@ function isTyping(e: KeyboardEvent) {
 
 export function AppShell() {
   const schema = useSchema();
+  const navigate = useNavigate();
   useBoard(Boolean(schema.data));
   useBoardRealtime(Boolean(schema.data));
   const {
@@ -33,6 +35,7 @@ export function AppShell() {
     setSidebarOpen,
     selection,
     setSelection,
+    tourOpen,
   } = useUi();
 
   useEffect(() => {
@@ -60,9 +63,16 @@ export function AppShell() {
 
       if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
 
+      if (tourOpen) return; // the tour owns the arrow keys while it is up
+
       if (e.key === '?') {
         e.preventDefault();
         setShortcutsOpen(true);
+        return;
+      }
+      if (e.key === 'h') {
+        e.preventDefault();
+        navigate('/home');
         return;
       }
       if (e.key === 'c' && !newIssueOpen) {
@@ -89,12 +99,18 @@ export function AppShell() {
     setSidebarOpen,
     selection,
     setSelection,
+    tourOpen,
+    navigate,
   ]);
 
   return (
     <div className="shell">
       {sidebarOpen && (
-        <div className="sidebar-scrim" onClick={() => setSidebarOpen(false)} aria-hidden="true" />
+        <div
+          className="sidebar-scrim"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
       )}
       <Sidebar />
       <main className="main">
@@ -113,6 +129,7 @@ export function AppShell() {
       <NewIssueDialog />
       <CommandPalette />
       <ShortcutsDialog />
+      <Tour />
     </div>
   );
 }

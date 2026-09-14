@@ -42,8 +42,9 @@ export const fields: FieldSpec[] = [
     ],
   },
   {
+    // Multi-valued: one issue often spans several platforms, so several teams own it.
     name: TEAM_FIELD,
-    type: 'SINGLE_SELECT',
+    type: 'MULTI_SELECT',
     options: [
       { name: 'iOS', color: 'BLUE' },
       { name: 'Android', color: 'GREEN' },

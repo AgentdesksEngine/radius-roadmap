@@ -5,7 +5,9 @@ import { Command } from 'cmdk';
 import {
   Archive,
   BarChart3,
+  Compass,
   ExternalLink,
+  Home,
   Inbox,
   Keyboard,
   LayoutGrid,
@@ -24,15 +26,8 @@ import { useUi } from '../shell/state';
 import './palette.css';
 
 export function CommandPalette() {
-  const {
-    paletteOpen,
-    setPaletteOpen,
-    openIssue,
-    setNewIssueOpen,
-    setShortcutsOpen,
-    filters,
-    setFilters,
-  } = useUi();
+  const { paletteOpen, setPaletteOpen, openIssue, setNewIssueOpen, setShortcutsOpen, startTour, filters, setFilters } =
+    useUi();
   const { data: board } = useBoard();
   const { data: schema } = useSchema();
   const navigate = useNavigate();
@@ -95,6 +90,7 @@ export function CommandPalette() {
               hint: 'C',
               fn: () => setNewIssueOpen(true),
             },
+            { id: 'home', label: 'Go to home', icon: <Home />, hint: 'H', fn: () => navigate('/home') },
             { id: 'inbox', label: 'Go to intake', icon: <Inbox />, fn: () => navigate('/inbox') },
             {
               id: 'board',
@@ -125,6 +121,12 @@ export function CommandPalette() {
                   archived: !f.archived,
                   state: f.archived ? 'active' : 'all',
                 })),
+            },
+            {
+              id: 'tour',
+              label: 'Show the guided tour',
+              icon: <Compass />,
+              fn: () => startTour(),
             },
             {
               id: 'shortcuts',

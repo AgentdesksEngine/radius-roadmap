@@ -3,7 +3,7 @@ import type { FieldWriteValue, ProjectField } from '@shared/types';
 import { useCreateIssue, useSchema } from '@/api/hooks';
 import { Button } from '@/components/ui/Button';
 import { useToast } from '@/components/ui/Toast';
-import { STATUS, TEAM, field } from '@/model/board';
+import { STATUS, TEAM, field, selectWrite } from '@/model/board';
 import { useUi } from '../shell/state';
 
 interface Props {
@@ -44,8 +44,8 @@ export function QuickAdd({ groupField, optionId, onClose }: Props) {
     }
     const teamField = field(schema, TEAM);
     const teamOption = teamField?.options?.find((o) => o.name === filters.team);
-    if (teamField && teamOption && !fields[teamField.name])
-      fields[teamField.name] = { singleSelectOptionId: teamOption.id };
+    const teamWrite = teamField && teamOption ? selectWrite(teamField, [teamOption.id]) : null;
+    if (teamField && teamWrite && !fields[teamField.name]) fields[teamField.name] = teamWrite;
 
     create.mutate(
       { title: t, fields },

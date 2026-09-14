@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import { Archive, ArchiveRestore, ListChecks, X } from 'lucide-react';
-import type { BoardItem, FieldWriteValue, ProjectField } from '@shared/types';
+import type { BoardItem, FieldValue, FieldWriteValue, ProjectField } from '@shared/types';
 import { useArchiveItem, useBoard, useBulkField, useSchema } from '@/api/hooks';
 import { Button, IconButton } from '@/components/ui/Button';
 import { Confirm } from '@/components/ui/Confirm';
 import { Picker } from '@/components/ui/Picker';
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
-import { PRIORITY, STATUS, TEAM, WORK_TYPE, field } from '@/model/board';
+import { PRIORITY, STATUS, TEAM, WORK_TYPE, field, selectWrite } from '@/model/board';
 import { PriorityIcon } from '../board/PriorityIcon';
 import { useUi } from '../shell/state';
 import './bulk.css';
@@ -49,19 +49,30 @@ export function BulkBar() {
     setSelection([]);
   };
 
-  /** Puts every item back to the value it held before the sweep, one call per old value. */
+  /** The value an item held before the sweep, in the shape the field actually takes. */
+  const previousWrite = (f: ProjectField, v: FieldValue | undefined): FieldWriteValue => {
+    if (v?.kind === 'singleSelect') return selectWrite(f, [v.optionId]);
+    if (v?.kind === 'multiSelect') return selectWrite(f, v.options.map((o) => o.id));
+    return null;
+  };
+
+  /** Puts every item back to what it held, one call per distinct previous value. */
   const undoFor = (f: ProjectField, before: BoardItem[]) => () => {
     const groups = new Map<string, string[]>();
     for (const i of before) {
       const v = i.fields[f.name];
-      const key = v?.kind === 'singleSelect' ? v.optionId : '__none';
+      const key =
+        v?.kind === 'singleSelect'
+          ? v.optionId
+          : v?.kind === 'multiSelect'
+            ? v.options.map((o) => o.id).sort().join(',')
+            : '__none';
       groups.set(key, [...(groups.get(key) ?? []), i.itemId]);
     }
-    for (const [optionId, itemIds] of groups) {
-      const value: FieldWriteValue =
-        optionId === '__none' ? null : { singleSelectOptionId: optionId };
+    for (const [, itemIds] of groups) {
+      const sample = before.find((i) => i.itemId === itemIds[0]);
       bulk.mutate(
-        { itemIds, fieldId: f.id, value },
+        { itemIds, fieldId: f.id, value: previousWrite(f, sample?.fields[f.name]) },
         { onError: (e) => toast.error(`Couldn’t undo: ${e.message}`) },
       );
     }
@@ -70,7 +81,7 @@ export function BulkBar() {
   const apply = (f: ProjectField, optionId: string) => {
     const before = items.map((i) => ({ ...i, fields: { ...i.fields } }));
     bulk.mutate(
-      { itemIds: selection, fieldId: f.id, value: { singleSelectOptionId: optionId } },
+      { itemIds: selection, fieldId: f.id, value: selectWrite(f, [optionId]) },
       {
         onSuccess: (r) => report(`Set ${f.name.toLowerCase()} on`, r.failed, undoFor(f, before)),
         onError: (e) => toast.error(`Bulk update failed: ${e.message}`),

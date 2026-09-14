@@ -3,6 +3,14 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { env, requireSupabaseEnv } from './env.js';
 
+/**
+ * Signed in until you sign out. Supabase rotates the refresh token on every use and the
+ * project has no session time-box, so the only thing that ends a session is the cookie
+ * expiring — left unset it would be a session cookie and die with the browser window.
+ * 365 days, under the 400-day ceiling browsers impose on Max-Age.
+ */
+export const SESSION_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
+
 function parseCookies(header?: string): { name: string; value: string }[] {
   if (!header) return [];
   return header
@@ -19,7 +27,7 @@ function parseCookies(header?: string): { name: string; value: string }[] {
 function serializeCookie(name: string, value: string, options: CookieOptions): string {
   const parts = [`${name}=${encodeURIComponent(value)}`];
   parts.push(`Path=${options.path ?? '/'}`);
-  if (options.maxAge !== undefined) parts.push(`Max-Age=${options.maxAge}`);
+  parts.push(`Max-Age=${options.maxAge ?? SESSION_MAX_AGE_SECONDS}`);
   if (options.domain) parts.push(`Domain=${options.domain}`);
   parts.push(`SameSite=${options.sameSite ?? 'Lax'}`);
   if (options.httpOnly !== false) parts.push('HttpOnly');
@@ -31,6 +39,7 @@ function serializeCookie(name: string, value: string, options: CookieOptions): s
 export function supabaseForRequest(req: VercelRequest, res: VercelResponse) {
   const e = requireSupabaseEnv();
   return createServerClient(e.SUPABASE_URL, e.SUPABASE_ANON_KEY, {
+    cookieOptions: { maxAge: SESSION_MAX_AGE_SECONDS },
     cookies: {
       getAll: () => parseCookies(req.headers.cookie),
       setAll: (cookies) => {

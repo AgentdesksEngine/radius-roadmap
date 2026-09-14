@@ -25,8 +25,30 @@ export const emailToLogin: Record<string, string> = {
   'prajwal@radiusagent.com': '',
 };
 
+/**
+ * Slack user-group membership → Team options, as of 2026-09-13:
+ * @webdevs, @ios-team, @android-team, @bedevs. Team is multi-valued, so an issue picks up
+ * every team its assignees belong to. Update this when people move between groups.
+ */
+export const emailToTeam: Record<string, string> = {
+  'sandeep.machiraju@radiusagent.com': 'Web',
+  'siddhant.agarwal@radiusagent.com': 'Web',
+  'ranjith@radiusagent.com': 'iOS',
+  'saranjith@radiusagent.com': 'iOS',
+  'prajwal@radiusagent.com': 'Android',
+  'milan.pokharna@radiusagent.com': 'Android',
+  'aman.motiyani@radiusagent.com': 'Android',
+  'shaily@radiusagent.com': 'Backend',
+  'shreyansh@radiusagent.com': 'Backend',
+  'mahesh@radiusagent.com': 'Backend',
+  'akashdeep@radiusagent.com': 'Backend',
+};
+
 /** Slack "Status" column → (Status option, Work type option, close reason). */
-export const statusMap: Record<string, { status: string; type?: string; close?: 'COMPLETED' | 'NOT_PLANNED' }> = {
+export const statusMap: Record<
+  string,
+  { status: string; type?: string; close?: 'COMPLETED' | 'NOT_PLANNED' }
+> = {
   'released to prod': { status: 'Done', close: 'COMPLETED' },
   'new requests': { status: 'Backlog', type: 'Feature request' },
   'yet to prioritise': { status: 'Backlog' },

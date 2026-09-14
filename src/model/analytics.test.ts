@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { BoardItem } from '@shared/types';
-import { ageBuckets, cycleTime, summarize, throughput, weekStart } from './analytics';
+import type { BoardItem, ProjectField } from '@shared/types';
+import { ageBuckets, cycleTime, openByField, summarize, throughput, weekStart } from './analytics';
 
 const NOW = Date.parse('2026-09-07T12:00:00Z'); // a Monday
 const DAY = 24 * 3600_000;
@@ -28,6 +28,10 @@ function item(partial: Partial<BoardItem> & { number: number }): BoardItem {
     subIssues: { total: 0, completed: 0, percent: 0 },
     reactions: [],
     fields: {},
+    pullRequests: [],
+    watcherCount: 0,
+    viewerWatching: false,
+    viewerStarred: false,
     ...partial,
   };
 }
@@ -134,5 +138,39 @@ describe('summarize', () => {
     const s = summarize(items, 30, NOW);
     expect(s).toMatchObject({ open: 2, createdRecently: 3, closedRecently: 1, net: 2 });
     expect(s.needsTriage).toBe(2);
+  });
+});
+
+describe('openByField with a multi-valued field', () => {
+  const TEAM_FIELD = {
+    id: 'f-team',
+    name: 'Team',
+    dataType: 'MULTI_SELECT',
+    options: [
+      { id: 'o-ios', name: 'iOS', color: 'BLUE', description: '' },
+      { id: 'o-web', name: 'Web', color: 'GREEN', description: '' },
+    ],
+  } as unknown as ProjectField;
+
+  const withTeams = (number: number, names: [string, string][]) =>
+    item({
+      number,
+      fields: {
+        Team: { kind: 'multiSelect', options: names.map(([id, name]) => ({ id, name })) },
+      },
+    });
+
+  it('counts an issue in every team that owns it', () => {
+    const buckets = openByField(
+      [withTeams(1, [['o-ios', 'iOS'], ['o-web', 'Web']]), withTeams(2, [['o-ios', 'iOS']])],
+      TEAM_FIELD,
+    );
+    expect(buckets.find((b) => b.label === 'iOS')?.count).toBe(2);
+    expect(buckets.find((b) => b.label === 'Web')?.count).toBe(1);
+  });
+
+  it('still reports issues with no team at all', () => {
+    const buckets = openByField([item({ number: 3 })], TEAM_FIELD);
+    expect(buckets.find((b) => b.label === 'No team')?.count).toBe(1);
   });
 });
