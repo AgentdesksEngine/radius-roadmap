@@ -60,7 +60,7 @@ export function AnalyticsView() {
   const weeks = useMemo(() => throughput(items, range.weeks), [items, range.weeks]);
   const cycle = useMemo(() => cycleTime(items, range.days), [items, range.days]);
   const ages = useMemo(() => ageBuckets(items), [items]);
-  const completed = useMemo(() => completedByPerson(items), [items]);
+  const completed = useMemo(() => completedByPerson(items, range.days), [items, range.days]);
 
   const scope = filters.team ? `${filters.team} · ` : '';
 
@@ -201,7 +201,11 @@ export function AnalyticsView() {
               buckets={ages}
               empty="No open issues"
             />
-            <CompletedTable rows={completed} />
+            <CompletedTable
+              rows={completed}
+              windowLabel={range.label}
+              onPick={(id) => go('/list', { assignees: [id] })}
+            />
           </div>
         </div>
       )}

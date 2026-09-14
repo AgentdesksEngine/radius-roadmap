@@ -290,10 +290,12 @@ export function StatTile({
 
 interface CompletedTableProps {
   rows: PersonCompleted[];
-  /** Width of the "recent" column, in days — the heading is written from it. */
-  windowDays?: number;
+  /** Heading for the recent column, so it tracks the page's range selector. */
+  windowLabel?: string;
   title?: string;
   empty?: string;
+  /** Drills into the board filtered to that person, like the bar lists do. */
+  onPick?: (profileId: string) => void;
 }
 
 /**
@@ -302,9 +304,10 @@ interface CompletedTableProps {
  */
 export function CompletedTable({
   rows,
-  windowDays = 30,
+  windowLabel = '30 days',
   title = 'Completed per person',
   empty = 'Nothing has been completed yet',
+  onPick,
 }: CompletedTableProps) {
   const total = rows.reduce((a, r) => a + r.total, 0);
   return (
@@ -323,7 +326,7 @@ export function CompletedTable({
             <thead>
               <tr>
                 <th>Person</th>
-                <th className="num">Last {windowDays} days</th>
+                <th className="num">Last {windowLabel}</th>
                 <th className="num">All time</th>
               </tr>
             </thead>
@@ -331,14 +334,22 @@ export function CompletedTable({
               {rows.map((r) => (
                 <tr key={r.person.id}>
                   <td>
-                    <span className="people-cell">
-                      {r.person.id === UNASSIGNED_ID ? (
-                        <span className="people-none" aria-hidden />
-                      ) : (
+                    {/* Unassigned is not a person, so there is nothing to filter the board by. */}
+                    {onPick && r.person.id !== UNASSIGNED_ID ? (
+                      <button className="people-cell pickable" onClick={() => onPick(r.person.id)}>
                         <Avatar person={r.person} size={18} />
-                      )}
-                      <span className="truncate">{r.person.name ?? 'Unknown'}</span>
-                    </span>
+                        <span className="truncate">{r.person.name ?? 'Unknown'}</span>
+                      </button>
+                    ) : (
+                      <span className="people-cell">
+                        {r.person.id === UNASSIGNED_ID ? (
+                          <span className="people-none" aria-hidden />
+                        ) : (
+                          <Avatar person={r.person} size={18} />
+                        )}
+                        <span className="truncate">{r.person.name ?? 'Unknown'}</span>
+                      </span>
+                    )}
                   </td>
                   <td className="num">{r.recent || ''}</td>
                   <td className="num">{r.total}</td>

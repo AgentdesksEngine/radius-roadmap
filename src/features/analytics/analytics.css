@@ -297,3 +297,17 @@
   border: 1px dashed var(--border-strong);
   flex: none;
 }
+.people-cell.pickable {
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin: -2px -4px;
+  border-radius: var(--radius-sm);
+  max-width: 100%;
+}
+.people-cell.pickable:hover {
+  background: var(--bg-subtle);
+}
