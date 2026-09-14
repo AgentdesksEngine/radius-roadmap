@@ -23,10 +23,22 @@ import { requireUser } from '../_lib/session.js';
  * matches one segment or more; the sibling index.ts it used to live in was worth more as a
  * free function slot.
  */
+/**
+ * Vercel's zero-config `api/` routing does NOT treat `[...path]` as a catch-all: it generates
+ * `^/api/issues/([^/]+)$`, which matches exactly one segment and binds it to a query key
+ * literally named `...path`. So `/api/issues/:id/comments` never reached this function at all —
+ * it 404'd at the router, silently, for as long as the route has existed.
+ *
+ * The rewrite in vercel.json folds the second segment into `?sub=`, which does match. Reading
+ * every shape below keeps this working under the rewrite, under Vercel's own param name, and
+ * under scripts/dev-api.ts (which binds a real catch-all array).
+ */
 function pathSegments(req: VercelRequest): [string, string | undefined] {
-  const raw = req.query.path;
-  const segments = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const [id, sub] = segments;
+  const q = req.query as Record<string, string | string[] | undefined>;
+  const raw = q.path ?? q['...path'];
+  const segments = Array.isArray(raw) ? raw : typeof raw === 'string' ? raw.split('/') : [];
+  const id = segments[0];
+  const sub = segments[1] ?? (typeof q.sub === 'string' ? q.sub : undefined);
   if (!id) throw new HttpError(404, 'Not found');
   return [id, sub];
 }
