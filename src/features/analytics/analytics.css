@@ -241,6 +241,7 @@
   margin: 0;
   font-size: 12.5px;
   color: var(--text-2);
+}
 /* STATS-01: figures that lead somewhere look like they do. */
 .stat.pickable,
 .bar-row.pickable {
