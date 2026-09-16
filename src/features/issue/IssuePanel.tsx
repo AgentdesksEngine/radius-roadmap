@@ -282,6 +282,24 @@ function PanelContent({
     else if (person) setAssignees([...item.assignees, person]);
   };
 
+  const setCollaborators = (next: Person[]) =>
+    patch(
+      {
+        issueId: item.issueId,
+        itemId: item.itemId,
+        collaboratorIds: next.map((p) => p.id),
+        optimisticCollaborators: next,
+      },
+      'collaborators',
+    );
+
+  const toggleCollaborator = (id: string) => {
+    const has = item.collaborators.some((c) => c.id === id);
+    const person = members?.find((m) => m.id === id);
+    if (has) setCollaborators(item.collaborators.filter((c) => c.id !== id));
+    else if (person) setCollaborators([...item.collaborators, person]);
+  };
+
   const copy = async (text: string, label: string) => {
     try {
       await navigator.clipboard?.writeText(text);
@@ -588,6 +606,40 @@ function PanelContent({
               ) : (
                 <>
                   <Avatar person={null} size={16} /> Unassigned
+                </>
+              )}
+            </button>
+          </Picker>
+
+          <span className="label">Collaborators</span>
+          <Picker
+            items={(members ?? []).map((m) => ({
+              id: m.id,
+              label: m.name || 'Unknown',
+              keywords: m.name ? [m.name] : [],
+              icon: <Avatar person={m} size={16} />,
+            }))}
+            value={item.collaborators.map((c) => c.id)}
+            multiple
+            onSelect={toggleCollaborator}
+            placeholder="Add collaborator…"
+          >
+            <button className={`prop-btn ${item.collaborators.length ? '' : 'empty'}`}>
+              {item.collaborators.length ? (
+                <span style={{ display: 'inline-flex', gap: 10, flexWrap: 'wrap' }}>
+                  {item.collaborators.map((c) => (
+                    <span
+                      key={c.id}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}
+                    >
+                      <Avatar person={c} size={16} />
+                      {c.name || 'Unknown'}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                <>
+                  <Avatar person={null} size={16} /> No collaborators
                 </>
               )}
             </button>

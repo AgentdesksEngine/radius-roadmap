@@ -75,6 +75,7 @@ export function encodeFilters(f: Filters): string | null {
   if (f.team !== DEFAULT_FILTERS.team) diff.team = f.team;
   if (f.state !== DEFAULT_FILTERS.state) diff.state = f.state;
   if (f.assignees.length) diff.assignees = f.assignees;
+  if (f.collaborators.length) diff.collaborators = f.collaborators;
   if (f.query) diff.query = f.query;
   if (f.archived) diff.archived = true;
   const select = Object.fromEntries(Object.entries(f.select).filter(([, v]) => v.length));
@@ -91,6 +92,7 @@ export function decodeFilters(raw: string | null): Filters {
       state: d.state ?? DEFAULT_FILTERS.state,
       select: d.select && typeof d.select === 'object' ? d.select : {},
       assignees: Array.isArray(d.assignees) ? d.assignees : [],
+      collaborators: Array.isArray(d.collaborators) ? d.collaborators : [],
       query: typeof d.query === 'string' ? d.query : '',
       archived: d.archived === true,
     };

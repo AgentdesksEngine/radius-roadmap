@@ -135,8 +135,14 @@ export function useUpdateIssue() {
     mutationFn: ({
       issueId,
       optimisticAssignees: _o,
+      optimisticCollaborators: _oc,
       ...body
-    }: UpdateIssueRequest & { issueId: string; itemId: string; optimisticAssignees?: Person[] }) =>
+    }: UpdateIssueRequest & {
+      issueId: string;
+      itemId: string;
+      optimisticAssignees?: Person[];
+      optimisticCollaborators?: Person[];
+    }) =>
       patch<{ ok: true; item: BoardItem | null }>(
         `/api/issues/${encodeURIComponent(issueId)}`,
         body,
@@ -150,6 +156,7 @@ export function useUpdateIssue() {
           title: args.title ?? i.title,
           body: args.body ?? i.body,
           assignees: args.optimisticAssignees ?? i.assignees,
+          collaborators: args.optimisticCollaborators ?? i.collaborators,
           state: args.state ?? i.state,
           stateReason:
             args.state === 'CLOSED'

@@ -41,7 +41,10 @@ export function CardBody({ item, schema, showTeam }: Pick<Props, 'item' | 'schem
             {item.parent.key}
           </span>
         )}
-        <AvatarStack people={item.assignees} size={18} />
+        <span style={{ display: 'inline-flex', gap: 4 }}>
+          <AvatarStack people={item.assignees} size={18} />
+          <AvatarStack people={item.collaborators} size={18} />
+        </span>
       </div>
       <div className="card-title">{item.title}</div>
       <div className="card-meta">

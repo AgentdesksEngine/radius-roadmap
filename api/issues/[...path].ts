@@ -49,6 +49,7 @@ const PatchBody = z.object({
   state: z.enum(['OPEN', 'CLOSED']).optional(),
   stateReason: z.enum(['COMPLETED', 'NOT_PLANNED', 'DUPLICATE', 'REOPENED']).optional(),
   assigneeIds: z.array(z.string()).optional(),
+  collaboratorIds: z.array(z.string()).optional(),
   /** Same value as :id today (issueId === itemId post-cutover); when given, the response includes the refreshed item. */
   itemId: z.string().optional(),
 });
@@ -75,6 +76,7 @@ const CreateBody = z.object({
     )
     .optional(),
   assigneeIds: z.array(z.string()).optional(),
+  collaboratorIds: z.array(z.string()).optional(),
   labelNames: z.array(z.string()).optional(),
 });
 

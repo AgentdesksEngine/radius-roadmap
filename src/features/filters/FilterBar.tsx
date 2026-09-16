@@ -23,13 +23,19 @@ const STATE_LABEL: Record<StateFilter, string> = {
   all: 'All',
 };
 const ASSIGNEE = '__assignee';
+const COLLABORATOR = '__collaborator';
 
 export function FilterBar() {
   const { data: schema } = useSchema();
   const { data: board } = useBoard();
   const { filters, setFilters } = useUi();
   const [picking, setPicking] = useState<string | null>(null);
-  const { data: members } = useMembers(picking === ASSIGNEE || filters.assignees.length > 0);
+  const { data: members } = useMembers(
+    picking === ASSIGNEE ||
+      picking === COLLABORATOR ||
+      filters.assignees.length > 0 ||
+      filters.collaborators.length > 0,
+  );
 
   if (!schema) return null;
   const fields = filterableFields(schema).filter((f) => f.name !== TEAM || filters.team === null);
@@ -38,8 +44,8 @@ export function FilterBar() {
     { id: '__none', label: `No ${f.name.toLowerCase()}` },
     ...(f.options ?? []).map((o) => ({ id: o.name, label: o.name, color: o.color })),
   ];
-  const assigneeItems: PickerItem[] = [
-    { id: '__none', label: 'Unassigned', icon: <Avatar person={null} size={16} /> },
+  const personItems = (noneLabel: string): PickerItem[] => [
+    { id: '__none', label: noneLabel, icon: <Avatar person={null} size={16} /> },
     ...(members ?? []).map((m) => ({
       id: m.id,
       label: m.name || 'Unknown',
@@ -47,6 +53,8 @@ export function FilterBar() {
       icon: <Avatar person={m} size={16} />,
     })),
   ];
+  const assigneeItems = personItems('Unassigned');
+  const collaboratorItems = personItems('No collaborators');
   const toggle = (arr: string[], v: string) =>
     arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 
@@ -87,9 +95,23 @@ export function FilterBar() {
       onRemove: () => setFilters((p) => ({ ...p, assignees: [] })),
     });
   }
+  if (filters.collaborators.length) {
+    chips.push({
+      key: COLLABORATOR,
+      label: 'Collaborator',
+      values: filters.collaborators.map((c) =>
+        c === '__none' ? 'none' : (collaboratorItems.find((i) => i.id === c)?.label ?? '…'),
+      ),
+      items: collaboratorItems,
+      onToggle: (id) => setFilters((p) => ({ ...p, collaborators: toggle(p.collaborators, id) })),
+      onRemove: () => setFilters((p) => ({ ...p, collaborators: [] })),
+    });
+  }
 
   const pickingField =
-    picking && picking !== ASSIGNEE ? fields.find((f) => f.name === picking) : undefined;
+    picking && picking !== ASSIGNEE && picking !== COLLABORATOR
+      ? fields.find((f) => f.name === picking)
+      : undefined;
   const n = activeFilterCount(filters);
   const closedCount = board?.items.filter((i) => i.state === 'CLOSED').length ?? 0;
 
@@ -100,7 +122,13 @@ export function FilterBar() {
           <span className="k">{c.label}</span>
           <Picker
             items={c.items}
-            value={c.key === ASSIGNEE ? filters.assignees : (filters.select[c.key] ?? [])}
+            value={
+              c.key === ASSIGNEE
+                ? filters.assignees
+                : c.key === COLLABORATOR
+                  ? filters.collaborators
+                  : (filters.select[c.key] ?? [])
+            }
             multiple
             onSelect={c.onToggle}
             placeholder={`Filter ${c.label.toLowerCase()}…`}
@@ -116,23 +144,31 @@ export function FilterBar() {
       ))}
 
       <Picker
-        items={pickingField ? fieldItems(pickingField) : assigneeItems}
+        items={picking === COLLABORATOR ? collaboratorItems : pickingField ? fieldItems(pickingField) : assigneeItems}
         value={
           picking === ASSIGNEE
             ? filters.assignees
-            : pickingField
-              ? (filters.select[pickingField.name] ?? [])
-              : []
+            : picking === COLLABORATOR
+              ? filters.collaborators
+              : pickingField
+                ? (filters.select[pickingField.name] ?? [])
+                : []
         }
         multiple
         open={picking !== null}
         onOpenChange={(o) => !o && setPicking(null)}
         placeholder={
-          picking === ASSIGNEE ? 'Filter assignee…' : `Filter ${picking?.toLowerCase() ?? ''}…`
+          picking === ASSIGNEE
+            ? 'Filter assignee…'
+            : picking === COLLABORATOR
+              ? 'Filter collaborator…'
+              : `Filter ${picking?.toLowerCase() ?? ''}…`
         }
         onSelect={(id) => {
           if (picking === ASSIGNEE)
             setFilters((p) => ({ ...p, assignees: toggle(p.assignees, id) }));
+          else if (picking === COLLABORATOR)
+            setFilters((p) => ({ ...p, collaborators: toggle(p.collaborators, id) }));
           else if (pickingField)
             setFilters((p) => ({
               ...p,
@@ -158,6 +194,7 @@ export function FilterBar() {
                 </MenuItem>
               ))}
               <MenuItem onSelect={() => setPicking(ASSIGNEE)}>Assignee</MenuItem>
+              <MenuItem onSelect={() => setPicking(COLLABORATOR)}>Collaborator</MenuItem>
               <MenuSeparator />
               <MenuLabel>Show</MenuLabel>
               {(['active', 'open', 'closed', 'all'] as StateFilter[]).map((s) => (
@@ -193,6 +230,7 @@ export function FilterBar() {
                         ...p,
                         select: {},
                         assignees: [],
+                        collaborators: [],
                         state: 'active',
                         archived: false,
                       }))

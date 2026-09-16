@@ -222,9 +222,10 @@ export function Sidebar() {
       <button
         className={`nav-item ${filters.archived ? 'active' : ''}`}
         style={{ marginTop: 8 }}
-        onClick={() =>
-          setFilters((f) => ({ ...f, archived: !f.archived, state: f.archived ? 'active' : 'all' }))
-        }
+        onClick={() => {
+          setFilters((f) => ({ ...f, archived: !f.archived, state: f.archived ? 'active' : 'all' }));
+          navigate('/board');
+        }}
       >
         <Archive /> Archived
       </button>

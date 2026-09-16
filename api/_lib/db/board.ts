@@ -209,6 +209,7 @@ interface RawIssueRow {
   commentCount: number;
   labels: { name: string; color: string }[];
   assignees: { id: string; name: string | null; avatarUrl: string | null }[];
+  collaborators: { id: string; name: string | null; avatarUrl: string | null }[];
   reactions: { content: string; count: number; viewerHasReacted: boolean }[];
   parentNumber: number | null;
   parentTitle: string | null;
@@ -243,6 +244,7 @@ async function queryIssues(viewerProfileId: string | null, filter: 'all' | { id:
         (select count(*)::int from comments c where c.issue_id = i.id) as "commentCount",
         coalesce(lbl.agg, '[]'::json) as labels,
         coalesce(asg.agg, '[]'::json) as assignees,
+        coalesce(col.agg, '[]'::json) as collaborators,
         coalesce(rxn.agg, '[]'::json) as reactions,
         coalesce(prs.agg, '[]'::json) as "pullRequests",
         coalesce(wch.cnt, 0) as "watcherCount",
@@ -262,6 +264,11 @@ async function queryIssues(viewerProfileId: string | null, filter: 'all' | { id:
         from issue_assignees ia join profiles p on p.id = ia.profile_id
         where ia.issue_id = i.id
       ) asg on true
+      left join lateral (
+        select json_agg(json_build_object('id', p.id, 'name', p.display_name, 'avatarUrl', p.avatar_url)) as agg
+        from issue_collaborators ic join profiles p on p.id = ic.profile_id
+        where ic.issue_id = i.id
+      ) col on true
       left join lateral (
         select json_agg(json_build_object(
           'content', r.content, 'count', r.cnt, 'viewerHasReacted', r.viewer_reacted
@@ -336,6 +343,10 @@ function rowToBoardItem(
     closedAt: row.closedAt,
     author: row.authorId ? { id: row.authorId, name: row.authorName, avatarUrl: row.authorAvatarUrl } : null,
     assignees: row.assignees.flatMap((p) => {
+      const person = personFromRow(p);
+      return person ? [person] : [];
+    }),
+    collaborators: row.collaborators.flatMap((p) => {
       const person = personFromRow(p);
       return person ? [person] : [];
     }),
@@ -480,6 +491,16 @@ export async function createIssue(profileId: string, req: CreateIssueRequest): P
     });
   }
 
+  let collaboratorIds: string[] = [];
+  if (req.collaboratorIds?.length) {
+    const members = await getMembers();
+    collaboratorIds = req.collaboratorIds.map((id) => {
+      const m = members.find((x) => x.id === id);
+      if (!m) throw new HttpError(400, `Unknown member "${id}"`);
+      return m.id;
+    });
+  }
+
   const newIssueId = await withActor(profileId, async (tx) => {
     const [issue] = await tx<{ id: string }[]>`
       insert into issues (title, body, author_id, fields)
@@ -491,6 +512,9 @@ export async function createIssue(profileId: string, req: CreateIssueRequest): P
     }
     for (const assigneeId of assigneeIds) {
       await tx`insert into issue_assignees (issue_id, profile_id) values (${issue!.id}, ${assigneeId})`;
+    }
+    for (const collaboratorId of collaboratorIds) {
+      await tx`insert into issue_collaborators (issue_id, profile_id) values (${issue!.id}, ${collaboratorId})`;
     }
     await ensureWatchers(tx, issue!.id, [
       { profileId, source: 'author' },
@@ -505,7 +529,7 @@ export async function createIssue(profileId: string, req: CreateIssueRequest): P
 export async function updateIssue(
   profileId: string,
   issueId: string,
-  patch: { title?: string; body?: string; assigneeIds?: string[] },
+  patch: { title?: string; body?: string; assigneeIds?: string[]; collaboratorIds?: string[] },
 ): Promise<void> {
   let assignedNames: string[] | undefined;
   await withActor(profileId, async (tx) => {
@@ -538,6 +562,22 @@ export async function updateIssue(
         validIds.map((id) => ({ profileId: id, source: 'assignee' as const })),
       );
       assignedNames = validIds.map((id) => members.find((m) => m.id === id)?.name ?? 'someone');
+    }
+    if (patch.collaboratorIds !== undefined) {
+      const members = await getMembers();
+      const validIds = patch.collaboratorIds.map((id) => {
+        const m = members.find((x) => x.id === id);
+        if (!m) throw new HttpError(400, `Unknown member "${id}"`);
+        return m.id;
+      });
+      if (validIds.length) {
+        await tx`delete from issue_collaborators where issue_id = ${issueId} and profile_id not in ${tx(validIds)}`;
+      } else {
+        await tx`delete from issue_collaborators where issue_id = ${issueId}`;
+      }
+      for (const id of validIds) {
+        await tx`insert into issue_collaborators (issue_id, profile_id) values (${issueId}, ${id}) on conflict do nothing`;
+      }
     }
   });
 
