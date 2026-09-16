@@ -27,6 +27,19 @@
   font-size: 11px;
   color: var(--text-3);
 }
+/*
+ * Hidden on desktop, shown only in the <=800px sheet layout below. Scoped with the parent
+ * class (not the bare .nav-toggle/.nav-close) so this beats .icon-btn's `display: inline-flex`
+ * on specificity alone -- a same-specificity tie here depends on CSS file load order, which
+ * silently flipped before and left both buttons visible (and inert) on desktop.
+ */
+.view-header .nav-toggle,
+.sidebar-head .nav-close {
+  display: none;
+}
+.sidebar-head .nav-close {
+  margin-left: auto;
+}
 .sidebar-section {
   margin-top: 12px;
   padding: 0 6px 4px;
@@ -238,8 +251,8 @@
     box-shadow: var(--shadow-pop);
     animation: slide-in-left 0.16s ease-out;
   }
-  .nav-toggle,
-  .nav-close {
+  .view-header .nav-toggle,
+  .sidebar-head .nav-close {
     display: inline-flex;
   }
   .search {
@@ -299,13 +312,6 @@
   justify-content: flex-end;
 }
 
-.nav-toggle,
-.nav-close {
-  display: none;
-}
-.sidebar-head .nav-close {
-  margin-left: auto;
-}
 .sidebar-scrim {
   position: fixed;
   inset: 0;
