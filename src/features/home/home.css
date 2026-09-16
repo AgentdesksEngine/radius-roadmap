@@ -4,7 +4,6 @@
   flex-direction: column;
   gap: 22px;
   overflow-y: auto;
-  max-width: 900px;
 }
 
 .home-callout {
