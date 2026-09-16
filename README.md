@@ -48,12 +48,10 @@ Browser (Vite + React SPA)  →  /api/* (Vercel functions)  →  Supabase Postgr
                                  │ browser also holds a Realtime subscription for live updates
 ```
 
-- **Auth**: Supabase Auth — **Continue with Google** is the primary path, with a six-digit
-  **email code** as the fallback for anyone whose Google account isn't the work one. Both are
-  restricted to `@radiusagent.com` by `profiles.allowed`, set by the `handle_new_user` trigger
+- **Auth**: Supabase Auth — a six-digit **email code** sent via `signInWithOtp`/`verifyOtp`.
+  Restricted to `@radiusagent.com` by `profiles.allowed`, set by the `handle_new_user` trigger
   from the email domain and checked server-side on every request via the service-role client,
-  not just at sign-in. Google's `hd` parameter is only a hint to Google's account chooser — it
-  is removable from the URL and is not the gate. `api/_lib/session.ts`'s `requireUser()` is the
+  not just at sign-in. `api/_lib/session.ts`'s `requireUser()` is the
   one place every protected route calls. Sessions last **a year** unless you sign out
   deliberately (`SESSION_MAX_AGE_SECONDS`, set on both the server and browser Supabase clients —
   without it the auth cookie dies when the browser closes).
@@ -209,11 +207,6 @@ You'll need a Supabase project (free tier is enough — see `SUPABASE_URL` /
 `SUPABASE_ANON_KEY` / `SUPABASE_SERVICE_ROLE_KEY` / `DATABASE_URL` in Project Settings → API /
 Database) with **every** migration in `supabase/migrations/` applied in order, and one of:
 
-- **Google** enabled in Supabase Auth (Authentication → Providers) with a Google Cloud OAuth
-  client. Three redirect URIs have to exist for it to work everywhere: the Google Cloud client
-  needs `https://<your project>.supabase.co/auth/v1/callback`, and Supabase's own redirect
-  allowlist (Authentication → URL Configuration) needs
-  `https://radius-roadmap.vercel.app/auth/callback` **and** `http://localhost:5173/auth/callback`.
 - **Email code** — the Email provider, with `{{ .Token }}` added to *both* the "Magic Link" and
   "Confirm signup" templates (Supabase uses the second one for a person's first-ever sign-in).
   Note Supabase's built-in sender is rate-limited to a handful of mails an hour across the whole
