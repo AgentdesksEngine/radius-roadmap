@@ -13,6 +13,8 @@ export interface OptionSpec {
   description?: string;
   /** Existing option name(s) to rename into this one, preserving the option id. */
   renameFrom?: string[];
+  /** Picking this option closes the issue; issues_sync_state_and_status() reads this live. */
+  closesAs?: 'COMPLETED' | 'NOT_PLANNED';
 }
 
 export type FieldSpec =
@@ -27,18 +29,32 @@ export const TEAM_FIELD = 'Team';
 
 export const fields: FieldSpec[] = [
   {
+    // Matches the Slack List's own "By status" board exactly (name, color, and column order)
+    // instead of a normalized Linear-style set, so the tracker reads the same as the sheet the
+    // team already triages from. Only 'Released to prod' and 'Duplicates requested by user'
+    // close an issue automatically; everything else is informational, same as 'On alert' never
+    // auto-closing under the old scheme.
     name: STATUS_FIELD,
     type: 'SINGLE_SELECT',
     options: [
-      { name: 'Backlog', color: 'GRAY', description: 'Not yet prioritised' },
-      { name: 'Todo', color: 'GRAY', description: 'Prioritised, not started' },
-      { name: 'In progress', color: 'YELLOW', description: 'Being worked on', renameFrom: ['In Progress'] },
-      { name: 'In review', color: 'ORANGE', description: 'Code review / dev testing' },
-      { name: 'In QA', color: 'BLUE', description: 'On staging with QA' },
-      { name: 'Ready to release', color: 'PINK', description: 'QA passed, waiting for a release' },
-      { name: 'Done', color: 'PURPLE', description: 'Released to production' },
-      { name: 'Canceled', color: 'GRAY', description: 'Duplicate or will not do' },
-      { name: "Can't reproduce", color: 'RED', description: 'On alert: could not replicate' },
+      { name: 'Yet to prioritise', color: 'GRAY' },
+      { name: 'Design', color: 'PURPLE' },
+      { name: 'UX Improvements', color: 'ORANGE' },
+      { name: 'New Requests', color: 'BLUE' },
+      { name: 'Bugs', color: 'BLUE' },
+      { name: 'Tasks', color: 'ORANGE' },
+      { name: 'Logrocket and Mel sessions', color: 'BLUE' },
+      { name: 'For the week', color: 'PURPLE' },
+      { name: 'Work in progress', color: 'PINK' },
+      { name: 'Dev Testing', color: 'BLUE' },
+      { name: 'On staging (With QA)', color: 'PURPLE' },
+      { name: 'Staging Bugs', color: 'BLUE' },
+      { name: 'Release Ready', color: 'PURPLE' },
+      { name: 'Released to prod', color: 'GREEN', closesAs: 'COMPLETED' },
+      { name: 'Backlog', color: 'PINK' },
+      { name: "On alert (couldn't replicate)", color: 'GRAY' },
+      { name: 'New Modules', color: 'PURPLE' },
+      { name: 'Duplicates requested by user', color: 'GREEN', closesAs: 'NOT_PLANNED' },
     ],
   },
   {
