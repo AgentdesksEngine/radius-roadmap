@@ -36,14 +36,7 @@ export async function seedFieldSchema(dryRun: boolean): Promise<FieldMaps> {
 
       if ('options' in spec) {
         for (const [optSortOrder, opt] of spec.options.entries()) {
-          const closesAs =
-            spec.name.toLowerCase() === 'status'
-              ? (['done'].includes(opt.name.toLowerCase())
-                  ? 'COMPLETED'
-                  : ['canceled', 'cancelled'].includes(opt.name.toLowerCase())
-                    ? 'NOT_PLANNED'
-                    : null)
-              : null;
+          const closesAs = opt.closesAs ?? null;
           let optionId: string;
           if (dryRun) {
             optionId = `dry-run:${spec.name}:${opt.name}`;
