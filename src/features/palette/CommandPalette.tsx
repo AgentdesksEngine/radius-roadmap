@@ -115,12 +115,14 @@ export function CommandPalette() {
               id: 'archived',
               label: filters.archived ? 'Back to the live board' : 'Show archived issues',
               icon: <Archive />,
-              fn: () =>
+              fn: () => {
                 setFilters((f) => ({
                   ...f,
                   archived: !f.archived,
                   state: f.archived ? 'active' : 'all',
-                })),
+                }));
+                navigate('/board');
+              },
             },
             {
               id: 'tour',
