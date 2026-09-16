@@ -264,6 +264,7 @@ export function ListView() {
                   ...f,
                   select: {},
                   assignees: [],
+                  collaborators: [],
                   team: null,
                   query: '',
                   state: 'active',

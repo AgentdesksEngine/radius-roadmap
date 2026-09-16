@@ -137,6 +137,7 @@ export interface BoardItem {
   closedAt: string | null;
   author: Person | null;
   assignees: Person[];
+  collaborators: Person[];
   labels: { name: string; color: string }[];
   commentCount: number;
   /** Archived project items stay in the project but are hidden from every view by default. */
@@ -186,6 +187,7 @@ export interface UpdateIssueRequest {
   state?: IssueState;
   stateReason?: IssueStateReason;
   assigneeIds?: string[];
+  collaboratorIds?: string[];
 }
 
 export interface IssueComment {
@@ -247,6 +249,7 @@ export interface CreateIssueRequest {
   /** field name -> write value, applied after the item is added to the project */
   fields?: Record<string, FieldWriteValue>;
   assigneeIds?: string[];
+  collaboratorIds?: string[];
   labelNames?: string[];
 }
 

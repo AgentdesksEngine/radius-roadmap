@@ -21,6 +21,7 @@ import { Picker, type PickerItem } from '@/components/ui/Picker';
 import { useToast } from '@/components/ui/Toast';
 import {
   ASSIGNEE_GROUP,
+  COLLABORATOR_GROUP,
   activeFilterCount,
   field,
   filterItems,
@@ -123,6 +124,7 @@ export function BoardView() {
     ? [
         ...selectFields(schema).map((f) => ({ id: f.name, label: f.name })),
         { id: ASSIGNEE_GROUP, label: 'Assignee' },
+        { id: COLLABORATOR_GROUP, label: 'Collaborator' },
       ]
     : [];
 
@@ -240,6 +242,7 @@ export function BoardView() {
                   ...f,
                   select: {},
                   assignees: [],
+                  collaborators: [],
                   team: null,
                   query: '',
                   state: 'active',

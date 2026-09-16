@@ -30,6 +30,7 @@ function item(partial: Partial<BoardItem> & { number: number }): BoardItem {
     closedAt: null,
     author: null,
     assignees: [],
+    collaborators: [],
     labels: [],
     commentCount: 0,
     isArchived: false,

@@ -4,6 +4,7 @@ import type {
   FieldValue,
   FieldWriteValue,
   OptionColor,
+  Person,
   ProjectField,
   ProjectSchema,
 } from '@shared/types';
@@ -137,6 +138,7 @@ export function colorVar(color: OptionColor | undefined): string {
 // ---------- Grouping ----------
 
 export const ASSIGNEE_GROUP = 'Assignee';
+export const COLLABORATOR_GROUP = 'Collaborator';
 
 export interface Group {
   key: string;
@@ -149,28 +151,38 @@ export interface Group {
   items: BoardItem[];
 }
 
-export function groupItems(items: BoardItem[], groupBy: string, schema: ProjectSchema): Group[] {
-  if (groupBy === ASSIGNEE_GROUP) {
-    const map = new Map<string, Group>();
-    const none: Group = { key: '__none', label: 'Unassigned', empty: true, items: [] };
-    for (const it of items) {
-      if (!it.assignees.length) {
-        none.items.push(it);
-        continue;
-      }
-      for (const a of it.assignees) {
-        let g = map.get(a.id);
-        if (!g) {
-          g = { key: a.id, label: a.name || 'Unknown', items: [] };
-          map.set(a.id, g);
-        }
-        g.items.push(it);
-      }
+/** Fans each item out into one group per person — an item with 2 people appears in 2 groups. */
+function groupByPeople(
+  items: BoardItem[],
+  people: (it: BoardItem) => Person[],
+  emptyLabel: string,
+): Group[] {
+  const map = new Map<string, Group>();
+  const none: Group = { key: '__none', label: emptyLabel, empty: true, items: [] };
+  for (const it of items) {
+    const ps = people(it);
+    if (!ps.length) {
+      none.items.push(it);
+      continue;
     }
-    const groups = [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
-    if (none.items.length) groups.push(none);
-    return groups;
+    for (const p of ps) {
+      let g = map.get(p.id);
+      if (!g) {
+        g = { key: p.id, label: p.name || 'Unknown', items: [] };
+        map.set(p.id, g);
+      }
+      g.items.push(it);
+    }
   }
+  const groups = [...map.values()].sort((a, b) => a.label.localeCompare(b.label));
+  if (none.items.length) groups.push(none);
+  return groups;
+}
+
+export function groupItems(items: BoardItem[], groupBy: string, schema: ProjectSchema): Group[] {
+  if (groupBy === ASSIGNEE_GROUP) return groupByPeople(items, (it) => it.assignees, 'Unassigned');
+  if (groupBy === COLLABORATOR_GROUP)
+    return groupByPeople(items, (it) => it.collaborators, 'No collaborators');
 
   const f = field(schema, groupBy);
   if (!f?.options) return [{ key: '__all', label: 'All', items }];
@@ -206,6 +218,7 @@ export interface Filters {
   /** field name -> set of option names */
   select: Record<string, string[]>;
   assignees: string[]; // profile ids, '__none' = unassigned
+  collaborators: string[]; // profile ids, '__none' = none
   query: string;
   /** Archived items are a separate world: true shows only them, false only the live board. */
   archived: boolean;
@@ -216,6 +229,7 @@ export const DEFAULT_FILTERS: Filters = {
   state: 'active',
   select: {},
   assignees: [],
+  collaborators: [],
   query: '',
   archived: false,
 };
@@ -248,7 +262,8 @@ export function matchesQuery(item: BoardItem, q: string): boolean {
   if (key === q || key.endsWith(`-${q}`) || String(item.number) === q) return true;
   if (item.title.toLowerCase().includes(q)) return true;
   if (item.body.toLowerCase().includes(q)) return true;
-  return item.assignees.some((a) => a.name?.toLowerCase().includes(q));
+  if (item.assignees.some((a) => a.name?.toLowerCase().includes(q))) return true;
+  return item.collaborators.some((c) => c.name?.toLowerCase().includes(q));
 }
 
 export function filterItems(items: BoardItem[], filters: Filters, now = Date.now()): BoardItem[] {
@@ -271,6 +286,13 @@ export function filterItems(items: BoardItem[], filters: Filters, now = Date.now
       );
       if (!hit) return false;
     }
+    if (filters.collaborators.length) {
+      const ids = it.collaborators.map((c) => c.id);
+      const hit = filters.collaborators.some((c) =>
+        c === '__none' ? ids.length === 0 : ids.includes(c),
+      );
+      if (!hit) return false;
+    }
     return matchesQuery(it, q);
   });
 }
@@ -279,6 +301,7 @@ export function activeFilterCount(f: Filters) {
   return (
     Object.values(f.select).filter((v) => v.length).length +
     (f.assignees.length ? 1 : 0) +
+    (f.collaborators.length ? 1 : 0) +
     (f.state !== 'active' ? 1 : 0) +
     (f.archived ? 1 : 0)
   );

@@ -71,6 +71,7 @@ function item(partial: Partial<BoardItem> & { number: number }): BoardItem {
     closedAt: null,
     author: null,
     assignees: [],
+    collaborators: [],
     labels: [],
     commentCount: 0,
     isArchived: false,
@@ -108,6 +109,7 @@ const items = [
     title: 'Crash on login',
     body: 'Stack trace mentions keychain',
     assignees: [{ id: 'alice', name: 'Alice', avatarUrl: null }],
+    collaborators: [{ id: 'bob', name: 'Bob', avatarUrl: null }],
   }),
 ];
 
@@ -121,6 +123,10 @@ describe('groupItems', () => {
   it('groups by assignee', () => {
     const groups = groupItems(items, 'Assignee', schema);
     expect(groups.map((g) => g.label)).toEqual(['Alice', 'Unassigned']);
+  });
+  it('groups by collaborator', () => {
+    const groups = groupItems(items, 'Collaborator', schema);
+    expect(groups.map((g) => g.label)).toEqual(['Bob', 'No collaborators']);
   });
 });
 
@@ -145,6 +151,16 @@ describe('filterItems', () => {
   it('filters unassigned', () => {
     expect(
       filterItems(items, { ...DEFAULT_FILTERS, assignees: ['__none'] }).map((i) => i.number),
+    ).toEqual([1]);
+  });
+  it('filters by collaborator id', () => {
+    expect(
+      filterItems(items, { ...DEFAULT_FILTERS, collaborators: ['bob'] }).map((i) => i.number),
+    ).toEqual([3]);
+  });
+  it('filters by no collaborators', () => {
+    expect(
+      filterItems(items, { ...DEFAULT_FILTERS, collaborators: ['__none'] }).map((i) => i.number),
     ).toEqual([1]);
   });
 });
