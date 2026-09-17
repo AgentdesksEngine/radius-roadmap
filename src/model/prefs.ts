@@ -33,19 +33,50 @@ export function usePref<T>(key: string, fallback: T): [T, (v: T | ((prev: T) => 
   return [value, set];
 }
 
-export type Theme = 'light' | 'dark' | 'system';
+export type Theme = 'light' | 'dark' | 'dracula' | 'monokai' | 'solarized-dark' | 'system';
 
-export function applyTheme(theme: Theme) {
-  const dark = theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+export const THEME_OPTIONS: ReadonlyArray<{ id: Theme; label: string; preview: string }> = [
+  {
+    id: 'system',
+    label: 'Match system',
+    preview: 'linear-gradient(135deg, #f3f3f3 50%, #181818 50%)',
+  },
+  { id: 'light', label: 'Light Modern', preview: '#f3f3f3' },
+  { id: 'dark', label: 'Dark Modern', preview: '#181818' },
+  { id: 'dracula', label: 'Dracula', preview: '#bd93f9' },
+  { id: 'monokai', label: 'Monokai', preview: '#a6e22e' },
+  { id: 'solarized-dark', label: 'Solarized Dark', preview: '#268bd2' },
+];
+
+const THEME_IDS = new Set<Theme>(THEME_OPTIONS.map(({ id }) => id));
+
+export function normalizeTheme(theme: unknown): Theme {
+  return typeof theme === 'string' && THEME_IDS.has(theme as Theme) ? (theme as Theme) : 'system';
+}
+
+export function themeColorScheme(theme: Theme): 'light' | 'dark' {
+  return theme === 'light' ? 'light' : 'dark';
+}
+
+export function applyTheme(value: unknown) {
+  const theme = normalizeTheme(value);
+  const resolved =
+    theme === 'system'
+      ? window.matchMedia('(prefers-color-scheme: dark)').matches
+        ? 'dark'
+        : 'light'
+      : theme;
+  document.documentElement.dataset.theme = resolved;
+  document.documentElement.dataset.colorScheme = themeColorScheme(resolved);
 }
 
 export function useTheme(): [Theme, (t: Theme) => void, 'light' | 'dark'] {
-  const [theme, setTheme] = usePref<Theme>('theme', 'system');
+  const [storedTheme, setTheme] = usePref<Theme>('theme', 'system');
+  const theme = normalizeTheme(storedTheme);
   const [resolved, setResolved] = useState<'light' | 'dark'>('light');
   useEffect(() => {
     applyTheme(theme);
-    setResolved(document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light');
+    setResolved(document.documentElement.dataset.colorScheme === 'dark' ? 'dark' : 'light');
     if (theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
     const onChange = () => {

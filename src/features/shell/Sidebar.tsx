@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import {
@@ -16,6 +16,7 @@ import {
   Monitor,
   Moon,
   MoreHorizontal,
+  Palette,
   Pin,
   PinOff,
   Plus,
@@ -41,7 +42,7 @@ import {
 import { Dot } from '@/components/ui/Tag';
 import { useToast } from '@/components/ui/Toast';
 import { TEAM, field, intakeItems, teamCounts } from '@/model/board';
-import { useTheme, type Theme } from '@/model/prefs';
+import { THEME_OPTIONS, useTheme } from '@/model/prefs';
 import { useSavedViews, viewHref } from '@/model/views';
 import { useUi } from './state';
 
@@ -68,12 +69,9 @@ export function Sidebar() {
   const myIssuesActive =
     me != null && filters.assignees.length === 1 && filters.assignees[0] === me;
 
-  const ThemeIcon = theme === 'dark' ? Moon : theme === 'light' ? Sun : Monitor;
-  const THEMES: { id: Theme; label: string; icon: ReactNode }[] = [
-    { id: 'light', label: 'Light', icon: <Sun /> },
-    { id: 'dark', label: 'Dark', icon: <Moon /> },
-    { id: 'system', label: 'Match system', icon: <Monitor /> },
-  ];
+  const ThemeIcon =
+    theme === 'system' ? Monitor : theme === 'light' ? Sun : theme === 'dark' ? Moon : Palette;
+  const themeLabel = THEME_OPTIONS.find(({ id }) => id === theme)?.label ?? 'Match system';
 
   // The sidebar is a sheet on narrow screens; going somewhere should put it away.
   useEffect(() => setSidebarOpen(false), [location.pathname, setSidebarOpen]);
@@ -285,15 +283,24 @@ export function Sidebar() {
         </Menu>
         <Menu>
           <MenuTrigger asChild>
-            <button className="icon-btn" aria-label={`Theme: ${theme}`}>
+            <button
+              className="icon-btn"
+              aria-label={`Color theme: ${themeLabel}`}
+              title={`Color theme: ${themeLabel}`}
+            >
               <ThemeIcon />
             </button>
           </MenuTrigger>
           <MenuContent side="top" align="end">
-            <MenuLabel>Theme</MenuLabel>
-            {THEMES.map((t) => (
-              <MenuItem key={t.id} onSelect={() => setTheme(t.id)} hint={theme === t.id ? '✓' : undefined}>
-                {t.icon} {t.label}
+            <MenuLabel>Color theme</MenuLabel>
+            {THEME_OPTIONS.map((t) => (
+              <MenuItem
+                key={t.id}
+                onSelect={() => setTheme(t.id)}
+                hint={theme === t.id ? '✓' : undefined}
+              >
+                <span className="theme-swatch" style={{ background: t.preview }} />
+                {t.label}
               </MenuItem>
             ))}
           </MenuContent>
