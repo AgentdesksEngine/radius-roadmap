@@ -6,6 +6,7 @@ import * as RadixTooltip from '@radix-ui/react-tooltip';
 import { App } from './App';
 import { ToastProvider } from './components/ui/Toast';
 import { applyTheme } from './model/prefs';
+import './styles/tailwind.css';
 import './styles/globals.css';
 import './components/ui/ui.css';
 
@@ -17,7 +18,11 @@ try {
 
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { retry: (count, err) => count < 2 && !(err instanceof Error && 'status' in err && (err as { status: number }).status === 401) },
+    queries: {
+      retry: (count, err) =>
+        count < 2 &&
+        !(err instanceof Error && 'status' in err && (err as { status: number }).status === 401),
+    },
     mutations: { retry: 0 },
   },
 });
